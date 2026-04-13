@@ -4,3 +4,5 @@ node_modules
 dist
 public/js
 .firebase-service-account.json
+scripts/
+tsconfig.scripts.json

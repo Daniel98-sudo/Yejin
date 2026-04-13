@@ -14,9 +14,12 @@
     "firebase-admin": "^13.8.0"
   },
   "devDependencies": {
+    "@types/dotenv": "^6.1.1",
     "@types/node": "^20.0.0",
     "@vercel/node": "^3.0.0",
+    "dotenv": "^17.4.2",
     "esbuild": "^0.20.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.4.0"
   }
 }
