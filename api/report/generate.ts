@@ -1,5 +1,7 @@
 import { verifyIdToken } from '../../src/lib/firebase-admin';
 import { evaluateRedFlag } from '../../src/lib/redflag';
+import { hasDataConsent, saveSession } from '../../src/lib/firestore';
+import { Timestamp } from 'firebase-admin/firestore';
 import type { Answer, ReportRequest, ReportResponse, ReportSection } from '../../src/types/index';
 
 function buildPrompt(answers: Answer[]): string {
@@ -12,9 +14,7 @@ function buildPrompt(answers: Answer[]): string {
 
 export async function POST(req: Request): Promise<Response> {
   const uid = await verifyIdToken(req);
-  if (!uid) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!uid) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
   let body: ReportRequest;
   try {
@@ -28,34 +28,42 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: 'answers is required' }, { status: 400 });
   }
 
-  // Authorization 헤더를 parse 프록시에 그대로 전달
   const authHeader = req.headers.get('Authorization') ?? '';
   const parseRes = await fetch(`${getBaseUrl(req)}/api/proxy/parse`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: authHeader,
-    },
+    headers: { 'Content-Type': 'application/json', Authorization: authHeader },
     body: JSON.stringify({ prompt: buildPrompt(answers) }),
   });
 
-  if (!parseRes.ok) {
-    return Response.json({ error: 'AI parsing failed' }, { status: 502 });
-  }
+  if (!parseRes.ok) return Response.json({ error: 'AI parsing failed' }, { status: 502 });
 
   const { result } = await parseRes.json() as {
     result: Omit<ReportSection, 'redFlag' | 'generatedAt' | 'algorithmVersion'>;
   };
 
+  const redFlag = evaluateRedFlag(answers);
   const report: ReportSection = {
     ...result,
-    redFlag: evaluateRedFlag(answers),
+    redFlag,
     generatedAt: new Date().toISOString(),
     algorithmVersion: '2026.04',
   };
 
-  const response: ReportResponse = { report };
-  return Response.json(response);
+  // 동의한 사용자에 한해 익명 세션 데이터 Firestore 저장 (PII 미포함)
+  const consent = await hasDataConsent(uid);
+  if (consent) {
+    await saveSession({
+      uid,
+      createdAt: Timestamp.now(),
+      date: new Date().toISOString().split('T')[0], // 날짜만 저장
+      answers: answers.map((a) => ({ questionId: a.questionId, value: a.value })),
+      redFlagLevel: redFlag.level,
+      painScale: Number(answers.find((a) => a.questionId === 'pain_scale')?.value ?? 0),
+      algorithmVersion: '2026.04',
+    });
+  }
+
+  return Response.json({ report } satisfies ReportResponse);
 }
 
 function getBaseUrl(req: Request): string {

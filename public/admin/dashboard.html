@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>예진이 — 관리자 대시보드</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; text-align: center; }
+    .stat-card .num { font-size: 32px; font-weight: 700; color: var(--primary); }
+    .stat-card .label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    .flag-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 14px; }
+    .flag-bar .bar { flex:1; height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; }
+    .flag-bar .fill { height: 100%; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: 8px 10px; color: var(--text-muted); font-weight: 600; border-bottom: 2px solid var(--border); }
+    td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    tr:last-child td { border-bottom: none; }
+    .admin-header { display:flex; justify-content:space-between; align-items:center; padding: 16px 0; }
+  </style>
+</head>
+<body>
+  <div class="page" style="max-width:720px;">
+    <div class="admin-header">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:20px;">🩺</span>
+        <strong>예진이 관리자</strong>
+      </div>
+      <button id="logout-btn" class="btn btn-ghost" style="width:auto; padding:8px 16px; font-size:13px;">로그아웃</button>
+    </div>
+
+    <div id="loading" class="loading">데이터를 불러오는 중...</div>
+
+    <div id="dashboard" class="hidden">
+      <h2 style="font-size:16px; font-weight:700; margin-bottom:12px;">📊 전체 통계</h2>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="num" id="stat-total">-</div><div class="label">총 문진 세션</div></div>
+        <div class="stat-card"><div class="num" id="stat-users">-</div><div class="label">동의 사용자 수</div></div>
+        <div class="stat-card"><div class="num" id="stat-recent">-</div><div class="label">최근 7일 문진</div></div>
+        <div class="stat-card"><div class="num" id="stat-emergency">-</div><div class="label">EMERGENCY 감지</div></div>
+      </div>
+
+      <div class="report-section" style="margin-bottom:16px;">
+        <h3>응급도 분포</h3>
+        <div id="flag-chart" style="margin-top:8px;"></div>
+      </div>
+
+      <div class="report-section">
+        <h3>최근 문진 세션 <span id="total-badge" style="font-weight:400; color:var(--text-muted);"></span></h3>
+        <div style="overflow-x:auto; margin-top:8px;">
+          <table>
+            <thead>
+              <tr>
+                <th>날짜</th>
+                <th>UID (앞 8자)</th>
+                <th>통증강도</th>
+                <th>응급도</th>
+              </tr>
+            </thead>
+            <tbody id="sessions-table"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:12px; display:flex; gap:8px;">
+          <button id="prev-btn" class="btn btn-ghost" style="width:auto;padding:8px 16px;font-size:13px;" disabled>← 이전</button>
+          <button id="next-btn" class="btn btn-ghost" style="width:auto;padding:8px 16px;font-size:13px;">다음 →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="/js/admin-dashboard.js"></script>
+</body>
+</html>
