@@ -19,6 +19,10 @@ function adminHeaders() {
 async function loadStats() {
   const res = await fetch('/api/admin/stats', { headers: adminHeaders() });
   if (res.status === 403) { window.location.href = '/admin/login.html'; return; }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(`/api/admin/stats: ${err.error ?? res.statusText}`);
+  }
 
   const data = await res.json() as {
     totalSessions: number;
@@ -46,6 +50,10 @@ async function loadSessions(offset: number) {
   const res = await fetch(`/api/admin/sessions?limit=${PAGE_SIZE}&offset=${offset}`, {
     headers: adminHeaders(),
   });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(`/api/admin/sessions: ${err.error ?? res.statusText}`);
+  }
   const data = await res.json() as {
     sessions: Array<{ id: string; uid: string; date: string; painScale: number; redFlagLevel: string }>;
     total: number;
@@ -89,18 +97,34 @@ async function init() {
     document.getElementById('logout-btn')!.addEventListener('click', () => logout());
     document.getElementById('prev-btn')!.addEventListener('click', async () => {
       currentOffset = Math.max(0, currentOffset - PAGE_SIZE);
-      await loadSessions(currentOffset);
+      await loadSessions(currentOffset).catch(showError);
     });
     document.getElementById('next-btn')!.addEventListener('click', async () => {
       currentOffset += PAGE_SIZE;
-      await loadSessions(currentOffset);
+      await loadSessions(currentOffset).catch(showError);
     });
 
-    await Promise.all([loadStats(), loadSessions(0)]);
-
-    document.getElementById('loading')!.classList.add('hidden');
-    document.getElementById('dashboard')!.classList.remove('hidden');
+    try {
+      await Promise.all([loadStats(), loadSessions(0)]);
+      document.getElementById('loading')!.classList.add('hidden');
+      document.getElementById('dashboard')!.classList.remove('hidden');
+    } catch (e) {
+      showError(e);
+    }
   });
+}
+
+function showError(e: unknown) {
+  const msg = e instanceof Error ? e.message : String(e);
+  const loading = document.getElementById('loading')!;
+  loading.innerHTML = `
+    <div style="color:#dc2626; text-align:center; padding:24px;">
+      <strong>데이터 로드 실패</strong><br/>
+      <span style="font-size:13px; color:var(--text-muted);">${msg}</span><br/><br/>
+      <button onclick="location.reload()" class="btn btn-ghost" style="font-size:13px;">다시 시도</button>
+    </div>`;
+  loading.classList.remove('hidden');
+  console.error('[dashboard]', e);
 }
 
 init();
