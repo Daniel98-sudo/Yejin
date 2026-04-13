@@ -6,8 +6,12 @@ import {
   resendVerification,
   resetPassword,
   syncDataConsent,
+  onAuthChanged,
+  getFirebaseAuth,
 } from '../lib/firebase-client';
 import type { User } from 'firebase/auth';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type Mode = 'signin' | 'signup';
 let mode: Mode = 'signin';
@@ -97,10 +101,14 @@ async function handleEmailSubmit() {
   const submitBtn = $<HTMLButtonElement>('submit-btn');
 
   if (!email || !password) { showMsg('이메일과 비밀번호를 입력해주세요.'); return; }
+  if (!EMAIL_RE.test(email)) { showMsg('이메일 형식이 올바르지 않습니다.'); return; }
 
   if (mode === 'signup') {
     const password2 = ($('password2') as HTMLInputElement).value;
     if (password.length < 8) { showMsg('비밀번호는 8자 이상으로 설정해주세요.'); return; }
+    if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+      showMsg('비밀번호는 영문자와 숫자를 모두 포함해야 합니다.'); return;
+    }
     if (password !== password2) { showMsg('비밀번호가 일치하지 않습니다.'); return; }
   }
 
@@ -168,6 +176,19 @@ function handlePendingBanner() {
 
 async function init() {
   await initFirebase();
+
+  // 이미 인증된 세션이 있으면 바로 채팅으로
+  onAuthChanged(async (user) => {
+    if (!user) return;
+    await user.reload();
+    const fresh = getFirebaseAuth().currentUser;
+    if (fresh && fresh.emailVerified) {
+      const token = await fresh.getIdToken();
+      sessionStorage.setItem('yejin_token', token);
+      await syncDataConsent(token);
+      window.location.href = '/chat.html';
+    }
+  });
 
   document.querySelectorAll('.auth-tab').forEach((el) => {
     el.addEventListener('click', () => setMode((el as HTMLElement).dataset.mode as Mode));
