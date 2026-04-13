@@ -180,6 +180,7 @@ function renderQuestion(question: Question) {
 
 function goToReport() {
   sessionStorage.setItem('yejin_answers', JSON.stringify(answers));
+  sessionStorage.setItem('yejin_session_id', sessionId);
   window.location.href = '/report.html';
 }
 

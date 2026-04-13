@@ -43,6 +43,7 @@ export interface SessionRecord {
   redFlagLevel: string;
   painScale: number;
   algorithmVersion: string;
+  report?: unknown; // 전체 예진 보고서 (ReportSection) — 병원 공유용
 }
 
 export interface UserConsent {
@@ -132,4 +133,97 @@ export async function updateHospitalStatus(
     reviewedAt: Timestamp.now(),
     reviewedBy,
   });
+}
+
+/**
+ * shareTokens/{token}
+ * 환자가 생성한 병원 공유 토큰. 스캔한 병원이 claim 하면 72시간 열람 가능.
+ */
+export interface ShareToken {
+  sessionId: string;
+  patientUid: string;
+  createdAt: Timestamp;
+  claimedAt?: Timestamp;
+  hospitalUid?: string;
+  expiresAt?: Timestamp;
+}
+
+export async function createShareToken(token: string, sessionId: string, patientUid: string) {
+  const db = getDb();
+  await db.collection('shareTokens').doc(token).set({
+    sessionId,
+    patientUid,
+    createdAt: Timestamp.now(),
+  } satisfies ShareToken);
+}
+
+export async function claimShareToken(
+  token: string,
+  hospitalUid: string,
+  viewHours: number
+): Promise<{ sessionId: string } | { error: string }> {
+  const db = getDb();
+  const ref = db.collection('shareTokens').doc(token);
+  const doc = await ref.get();
+  if (!doc.exists) return { error: '유효하지 않은 QR 코드입니다.' };
+
+  const data = doc.data() as ShareToken;
+  if (data.claimedAt) {
+    if (data.hospitalUid === hospitalUid) return { sessionId: data.sessionId };
+    return { error: '이미 다른 병원에서 사용된 QR 코드입니다.' };
+  }
+
+  // QR 생성 후 30분 내 claim 필요 (만료)
+  const createdMs = data.createdAt.toMillis();
+  if (Date.now() - createdMs > 30 * 60 * 1000) {
+    return { error: 'QR 코드가 만료되었습니다. 환자에게 새 코드를 요청해주세요.' };
+  }
+
+  const expiresAt = Timestamp.fromMillis(Date.now() + viewHours * 60 * 60 * 1000);
+  await ref.update({
+    claimedAt: Timestamp.now(),
+    hospitalUid,
+    expiresAt,
+  });
+  return { sessionId: data.sessionId };
+}
+
+export async function listHospitalReports(
+  hospitalUid: string
+): Promise<Array<{ token: string; sessionId: string; claimedAt: Timestamp; expiresAt: Timestamp; session: SessionRecord }>> {
+  const db = getDb();
+  const now = Timestamp.now();
+  const snap = await db
+    .collection('shareTokens')
+    .where('hospitalUid', '==', hospitalUid)
+    .where('expiresAt', '>', now)
+    .get();
+
+  const results = await Promise.all(
+    snap.docs.map(async (d) => {
+      const token = d.data() as ShareToken;
+      const sessionDoc = await db.collection('sessions').doc(token.sessionId).get();
+      if (!sessionDoc.exists) return null;
+      return {
+        token: d.id,
+        sessionId: token.sessionId,
+        claimedAt: token.claimedAt!,
+        expiresAt: token.expiresAt!,
+        session: sessionDoc.data() as SessionRecord,
+      };
+    })
+  );
+
+  return results.filter((r): r is NonNullable<typeof r> => r !== null);
+}
+
+export async function getSessionById(sessionId: string): Promise<SessionRecord | null> {
+  const db = getDb();
+  const doc = await db.collection('sessions').doc(sessionId).get();
+  return doc.exists ? (doc.data() as SessionRecord) : null;
+}
+
+export async function saveSessionWithId(sessionId: string, record: SessionRecord): Promise<void> {
+  const db = getDb();
+  await db.collection('sessions').doc(sessionId).set(record);
 }

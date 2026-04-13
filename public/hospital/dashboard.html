@@ -5,28 +5,52 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>예진이 — 병원 대시보드</title>
   <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    body, .page { max-width: 1080px !important; }
+    .page { padding: 24px 32px; }
+    .hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; padding-bottom:16px; border-bottom:1px solid var(--border); }
+    .summary { display:flex; gap:12px; margin-bottom:24px; }
+    .summary-card { flex:1; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px; }
+    .summary-num { font-size:28px; font-weight:700; color:var(--primary); }
+    .summary-label { font-size:12px; color:var(--text-muted); margin-top:4px; }
+    .date-group { margin-bottom:20px; }
+    .date-header { font-size:14px; font-weight:700; color:#1e3a5f; padding:8px 12px; background:#eff6ff; border-radius:8px; margin-bottom:10px; }
+    .report-card { background:white; border:1px solid var(--border); border-radius:10px; padding:16px; margin-bottom:10px; }
+    .report-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+    .report-body { font-size:13px; color:#334155; display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    .report-body h4 { font-size:12px; color:var(--text-muted); margin:0 0 4px 0; font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
+    .report-body p, .report-body li { margin:2px 0; font-size:13px; color:#0f172a; }
+    .report-body ul { padding-left:18px; margin:2px 0; }
+    .badge-wrap { font-size:11px; color:var(--text-muted); }
+    .expires { font-size:11px; color:#dc2626; }
+    @media (max-width: 900px) {
+      body { padding:12px; }
+      .page { padding:16px; }
+      .summary { flex-direction: column; }
+      .report-body { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 <body>
   <div class="page">
-    <div class="header">
-      <div class="logo">🏥</div>
-      <h1>병원 대시보드</h1>
-      <p id="hospital-name">로딩 중...</p>
+    <div class="hdr">
+      <div>
+        <h1 style="margin:0; font-size:22px;">🏥 <span id="hospital-name">병원 대시보드</span></h1>
+        <p style="margin:4px 0 0 0; font-size:13px; color:var(--text-muted);">환자가 QR로 공유한 문진 보고서 (72시간 열람)</p>
+      </div>
+      <button id="logout-btn" class="btn btn-ghost" style="width:auto; padding:8px 16px; font-size:13px;">로그아웃</button>
     </div>
 
-    <div id="loading" style="padding:24px; text-align:center; color:var(--text-muted);">데이터 로드 중...</div>
+    <div id="loading" style="padding:40px; text-align:center; color:var(--text-muted);">데이터 불러오는 중...</div>
 
     <div id="content" class="hidden">
-      <div class="disclaimer" style="background:#eff6ff; border-color:#bfdbfe; color:#1e3a5f;">
-        <strong>병원 대시보드 (준비 중)</strong>
-        의료진이 예진 보고서를 조회할 수 있는 기능이 곧 제공됩니다.
+      <div class="summary">
+        <div class="summary-card"><div class="summary-num" id="total-count">-</div><div class="summary-label">활성 공유 리포트</div></div>
+        <div class="summary-card"><div class="summary-num" id="today-count">-</div><div class="summary-label">오늘 수신</div></div>
+        <div class="summary-card"><div class="summary-num" id="emergency-count">-</div><div class="summary-label">EMERGENCY 건</div></div>
       </div>
-    </div>
 
-    <div style="flex:1"></div>
-
-    <div style="padding-bottom: 24px;">
-      <button id="logout-btn" class="btn btn-ghost" style="width:100%;">로그아웃</button>
+      <div id="reports-list"></div>
     </div>
   </div>
 

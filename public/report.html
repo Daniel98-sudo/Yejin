@@ -17,6 +17,32 @@
     </div>
 
     <div id="loading" class="loading">보고서를 생성하고 있어요...</div>
+
+    <!-- 병원 공유 QR 섹션 -->
+    <div id="share-section" class="hidden" style="background:#f8fafc; border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:16px; text-align:center;">
+      <h3 style="margin:0 0 10px 0; font-size:16px;">📱 병원에 공유하기</h3>
+
+      <div id="share-consent" style="text-align:left; background:white; padding:12px; border-radius:8px; margin-bottom:12px; font-size:13px;">
+        <label style="display:flex; gap:8px; align-items:flex-start; cursor:pointer;">
+          <input type="checkbox" id="share-agree" style="margin-top:3px;" />
+          <span>
+            이 QR을 스캔한 병원이 <strong>72시간 동안</strong> 내 문진 보고서를 열람하는 것에 동의합니다.
+            (스캔 후 30분 이내 사용하지 않으면 QR이 만료됩니다.)
+          </span>
+        </label>
+      </div>
+
+      <button id="gen-qr-btn" class="btn btn-primary" style="width:100%;" disabled>QR 코드 생성</button>
+
+      <div id="qr-container" class="hidden" style="margin-top:16px;">
+        <div id="qr-canvas" style="display:inline-block; padding:14px; background:white; border:1px solid var(--border); border-radius:12px;"></div>
+        <p style="font-size:12px; color:var(--text-muted); margin-top:10px;">
+          병원 계정으로 로그인된 기기에서 이 코드를 스캔하면<br/>진료에 필요한 정보를 열람할 수 있습니다.
+        </p>
+        <p id="qr-url-box" style="font-size:11px; color:var(--text-muted); margin-top:8px; word-break:break-all;"></p>
+      </div>
+    </div>
+
     <div id="report-content" class="report-wrap hidden"></div>
 
     <div class="report-footer">

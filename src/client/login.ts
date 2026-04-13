@@ -63,7 +63,7 @@ async function proceedAfterLogin(user: User) {
   const token = await user.getIdToken();
   sessionStorage.setItem('yejin_token', token);
   await syncDataConsent(token);
-  window.location.href = '/chat.html';
+  window.location.href = '/consult.html';
 }
 
 function showVerifyPrompt(user: User) {
@@ -186,7 +186,7 @@ async function init() {
       const token = await fresh.getIdToken();
       sessionStorage.setItem('yejin_token', token);
       await syncDataConsent(token);
-      window.location.href = '/chat.html';
+      window.location.href = '/consult.html';
     }
   });
 

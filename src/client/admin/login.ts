@@ -73,10 +73,13 @@ async function init() {
       sessionStorage.setItem('yejin_admin_token', token);
       sessionStorage.setItem('yejin_admin_role', String(role ?? ''));
 
+      const returnUrl = new URLSearchParams(location.search).get('return');
+      const safeReturn = returnUrl && returnUrl.startsWith('/') ? returnUrl : null;
+
       if (role === 'superadmin') {
-        window.location.href = '/admin/dashboard.html';
+        window.location.href = safeReturn ?? '/admin/dashboard.html';
       } else if (role === 'hospital') {
-        window.location.href = '/hospital/dashboard.html';
+        window.location.href = safeReturn ?? '/hospital/dashboard.html';
       } else {
         // 권한 없는 계정 — 병원 신청 여부 확인
         const statusRes = await fetch('/api/hospital/status', { headers: { Authorization: `Bearer ${token}` } });

@@ -1,6 +1,7 @@
 import { verifyIdToken } from '../../src/lib/firebase-admin';
 import { evaluateRedFlag } from '../../src/lib/redflag';
-import { hasDataConsent, saveSession } from '../../src/lib/firestore';
+import { saveSessionWithId, getSessionById } from '../../src/lib/firestore';
+import { getWeeklyQuota } from '../../src/lib/quota';
 import { Timestamp } from 'firebase-admin/firestore';
 import type { Answer, ReportRequest, ReportResponse, ReportSection } from '../../src/types/index';
 
@@ -23,9 +24,24 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { answers } = body;
-  if (!Array.isArray(answers) || answers.length === 0) {
-    return Response.json({ error: 'answers is required' }, { status: 400 });
+  const { sessionId, answers } = body;
+  if (!sessionId || !Array.isArray(answers) || answers.length === 0) {
+    return Response.json({ error: 'sessionId 및 answers 가 필요합니다.' }, { status: 400 });
+  }
+
+  // 이미 저장된 세션이면 리포트 재사용 (새로고침 시 중복 차감 방지)
+  const existing = await getSessionById(sessionId);
+  if (existing?.report) {
+    return Response.json({ report: existing.report as ReportSection } satisfies ReportResponse);
+  }
+
+  // 이번 주 쿼터 체크 — 3회 초과 시 차단
+  const quota = await getWeeklyQuota(uid);
+  if (quota.remaining <= 0) {
+    return Response.json({
+      error: '이번 주 문진 작성 횟수(3회)를 모두 사용했습니다.',
+      quota,
+    }, { status: 429 });
   }
 
   const authHeader = req.headers.get('Authorization') ?? '';
@@ -34,7 +50,6 @@ export async function POST(req: Request): Promise<Response> {
     headers: { 'Content-Type': 'application/json', Authorization: authHeader },
     body: JSON.stringify({ prompt: buildPrompt(answers) }),
   });
-
   if (!parseRes.ok) return Response.json({ error: 'AI parsing failed' }, { status: 502 });
 
   const { result } = await parseRes.json() as {
@@ -49,19 +64,17 @@ export async function POST(req: Request): Promise<Response> {
     algorithmVersion: '2026.04',
   };
 
-  // 동의한 사용자에 한해 익명 세션 데이터 Firestore 저장 (PII 미포함)
-  const consent = await hasDataConsent(uid);
-  if (consent) {
-    await saveSession({
-      uid,
-      createdAt: Timestamp.now(),
-      date: new Date().toISOString().split('T')[0], // 날짜만 저장
-      answers: answers.map((a) => ({ questionId: a.questionId, value: a.value })),
-      redFlagLevel: redFlag.level,
-      painScale: Number(answers.find((a) => a.questionId === 'pain_scale')?.value ?? 0),
-      algorithmVersion: '2026.04',
-    });
-  }
+  // 세션 + 리포트 저장 (병원 공유 대비 — §28조의2 필수 동의)
+  await saveSessionWithId(sessionId, {
+    uid,
+    createdAt: Timestamp.now(),
+    date: new Date().toISOString().split('T')[0],
+    answers: answers.map((a) => ({ questionId: a.questionId, value: a.value })),
+    redFlagLevel: redFlag.level,
+    painScale: Number(answers.find((a) => a.questionId === 'pain_scale')?.value ?? 0),
+    algorithmVersion: '2026.04',
+    report,
+  });
 
   return Response.json({ report } satisfies ReportResponse);
 }

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "esbuild src/client/index.ts src/client/chat.ts src/client/report.ts src/client/login.ts src/client/admin/login.ts src/client/admin/dashboard.ts src/client/hospital/signup.ts src/client/hospital/pending.ts src/client/hospital/dashboard.ts --bundle --outdir=public/js --platform=browser --target=es2020 --minify",
+    "build": "esbuild src/client/index.ts src/client/chat.ts src/client/report.ts src/client/login.ts src/client/consult.ts src/client/share.ts src/client/admin/login.ts src/client/admin/dashboard.ts src/client/hospital/signup.ts src/client/hospital/pending.ts src/client/hospital/dashboard.ts --bundle --outdir=public/js --platform=browser --target=es2020 --minify",
     "dev": "vercel dev",
     "typecheck": "tsc --noEmit"
   },
@@ -11,11 +11,13 @@
     "@ai-sdk/google": "^3.0.62",
     "ai": "^6.0.158",
     "firebase": "^12.12.0",
-    "firebase-admin": "^13.8.0"
+    "firebase-admin": "^13.8.0",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@types/dotenv": "^6.1.1",
     "@types/node": "^20.0.0",
+    "@types/qrcode": "^1.5.6",
     "@vercel/node": "^3.0.0",
     "dotenv": "^17.4.2",
     "esbuild": "^0.20.0",

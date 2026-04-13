@@ -1,8 +1,12 @@
 import type { Answer, ReportResponse, ReportSection } from '../types/index';
 import { requireAuth, authHeaders } from './auth-guard';
+import QRCode from 'qrcode';
 
 const loadingEl = document.getElementById('loading')!;
 const contentEl = document.getElementById('report-content')!;
+const shareSection = document.getElementById('share-section')!;
+
+let currentSessionId = '';
 
 function renderBadge(level: string): string {
   return `<span class="badge badge-${level}">${level}</span>`;
@@ -17,30 +21,15 @@ function renderReport(report: ReportSection) {
     .map((q) => `<li>${q}</li>`).join('') || '<li>없음</li>';
 
   contentEl.innerHTML = `
-    <div class="report-section">
-      <h3>주증상</h3>
-      <p>${report.chiefComplaint ?? '-'}</p>
-    </div>
-    <div class="report-section">
-      <h3>발병 시점</h3>
-      <p>${report.onset ?? '-'}</p>
-    </div>
+    <div class="report-section"><h3>주증상</h3><p>${report.chiefComplaint ?? '-'}</p></div>
+    <div class="report-section"><h3>발병 시점</h3><p>${report.onset ?? '-'}</p></div>
     <div class="report-section">
       <h3>통증 강도</h3>
       <p class="pain-scale">${report.painScale ?? 0} <span style="font-size:16px;font-weight:400;color:var(--text-muted)">/ 10</span></p>
     </div>
-    <div class="report-section">
-      <h3>동반 증상</h3>
-      <ul>${symptoms}</ul>
-    </div>
-    <div class="report-section">
-      <h3>과거력</h3>
-      <p>${report.previousHistory ?? '-'}</p>
-    </div>
-    <div class="report-section">
-      <h3>최근 약물 변화</h3>
-      <p>${report.medicationChanges ?? '-'}</p>
-    </div>
+    <div class="report-section"><h3>동반 증상</h3><ul>${symptoms}</ul></div>
+    <div class="report-section"><h3>과거력</h3><p>${report.previousHistory ?? '-'}</p></div>
+    <div class="report-section"><h3>최근 약물 변화</h3><p>${report.medicationChanges ?? '-'}</p></div>
     <div class="report-section">
       <h3>⭐ 의사에게 꼭 물어볼 것</h3>
       <ul class="questions-list">${questions}</ul>
@@ -52,29 +41,75 @@ function renderReport(report: ReportSection) {
       <p style="margin-top:4px;font-size:14px;color:var(--text-muted);">${report.redFlag.action}</p>
     </div>
     <div style="margin-top:16px;">
-      <button class="btn btn-ghost" onclick="window.location.href='/'">처음으로</button>
+      <button class="btn btn-ghost" onclick="window.location.href='/consult.html'">처음으로</button>
     </div>
   `;
+}
 
-  loadingEl.classList.add('hidden');
-  contentEl.classList.remove('hidden');
+async function generateQR() {
+  const btn = document.getElementById('gen-qr-btn') as HTMLButtonElement;
+  btn.disabled = true;
+  btn.textContent = '생성 중...';
+
+  try {
+    const res = await fetch('/api/share/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ sessionId: currentSessionId }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'QR 생성 실패' }));
+      alert(err.error ?? 'QR 생성 실패');
+      btn.disabled = false;
+      btn.textContent = 'QR 코드 생성';
+      return;
+    }
+    const data = await res.json() as { token: string; shareUrl: string };
+
+    const canvas = document.createElement('canvas');
+    await QRCode.toCanvas(canvas, data.shareUrl, { width: 260, margin: 1, errorCorrectionLevel: 'M' });
+    const container = document.getElementById('qr-canvas')!;
+    container.innerHTML = '';
+    container.appendChild(canvas);
+
+    document.getElementById('qr-url-box')!.textContent = data.shareUrl;
+    document.getElementById('qr-container')!.classList.remove('hidden');
+
+    btn.textContent = 'QR 재생성';
+    btn.disabled = false;
+  } catch (e) {
+    alert(e instanceof Error ? e.message : 'QR 생성 실패');
+    btn.disabled = false;
+    btn.textContent = 'QR 코드 생성';
+  }
 }
 
 async function init() {
   await requireAuth();
 
+  currentSessionId = sessionStorage.getItem('yejin_session_id') ?? '';
   const raw = sessionStorage.getItem('yejin_answers');
-  if (!raw) { window.location.href = '/'; return; }
+  if (!raw || !currentSessionId) { window.location.href = '/consult.html'; return; }
 
   const answers: Answer[] = JSON.parse(raw);
 
   const res = await fetch('/api/report/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ answers }),
+    body: JSON.stringify({ sessionId: currentSessionId, answers }),
   });
 
   if (res.status === 401) { window.location.href = '/login.html'; return; }
+
+  if (res.status === 429) {
+    const err = await res.json() as { error: string };
+    loadingEl.innerHTML = `
+      <div style="color:#dc2626; text-align:center; padding:24px;">
+        <strong>${err.error}</strong><br/>
+        <a href="/consult.html" style="color:#2563eb; font-size:13px;">← 돌아가기</a>
+      </div>`;
+    return;
+  }
 
   if (!res.ok) {
     loadingEl.textContent = '보고서 생성에 실패했습니다. 다시 시도해주세요.';
@@ -83,6 +118,16 @@ async function init() {
 
   const data: ReportResponse = await res.json();
   renderReport(data.report);
+
+  loadingEl.classList.add('hidden');
+  shareSection.classList.remove('hidden');
+  contentEl.classList.remove('hidden');
+
+  // 공유 동의 체크박스 → QR 생성 버튼 활성화
+  const agree = document.getElementById('share-agree') as HTMLInputElement;
+  const genBtn = document.getElementById('gen-qr-btn') as HTMLButtonElement;
+  agree.addEventListener('change', () => { genBtn.disabled = !agree.checked; });
+  genBtn.addEventListener('click', generateQR);
 }
 
 init();
