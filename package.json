@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "esbuild src/client/index.ts src/client/chat.ts src/client/report.ts src/client/login.ts src/client/consult.ts src/client/share.ts src/client/legal.ts src/client/mypage.ts src/client/admin/login.ts src/client/admin/dashboard.ts src/client/hospital/signup.ts src/client/hospital/pending.ts src/client/hospital/dashboard.ts --bundle --outdir=public/js --platform=browser --target=es2020 --minify",
+    "build": "esbuild src/client/index.ts src/client/chat.ts src/client/report.ts src/client/login.ts src/client/consult.ts src/client/share.ts src/client/legal.ts src/client/mypage.ts src/client/history.ts src/client/admin/login.ts src/client/admin/dashboard.ts src/client/hospital/signup.ts src/client/hospital/pending.ts src/client/hospital/dashboard.ts --bundle --outdir=public/js --platform=browser --target=es2020 --minify",
     "dev": "vercel dev",
     "typecheck": "tsc --noEmit"
   },

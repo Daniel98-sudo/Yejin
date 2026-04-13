@@ -1,4 +1,4 @@
-import type { Answer, ReportResponse, ReportSection } from '../types/index';
+import type { ReportResponse, ReportSection, ChatSummary, RedFlagResult } from '../types/index';
 import { requireAuth, authHeaders } from './auth-guard';
 import QRCode from 'qrcode';
 
@@ -88,15 +88,31 @@ async function init() {
   await requireAuth();
 
   currentSessionId = sessionStorage.getItem('yejin_session_id') ?? '';
-  const raw = sessionStorage.getItem('yejin_answers');
-  if (!raw || !currentSessionId) { window.location.href = '/consult.html'; return; }
+  if (!currentSessionId) { window.location.href = '/consult.html'; return; }
 
-  const answers: Answer[] = JSON.parse(raw);
+  const summaryRaw = sessionStorage.getItem('yejin_chat_summary');
+  const historyRaw = sessionStorage.getItem('yejin_chat_history');
+  const redFlagRaw = sessionStorage.getItem('yejin_chat_redflag');
+  const legacyAnswersRaw = sessionStorage.getItem('yejin_answers');
+
+  let body: Record<string, unknown> = { sessionId: currentSessionId };
+
+  if (summaryRaw && historyRaw) {
+    const summary: ChatSummary = JSON.parse(summaryRaw);
+    const history = JSON.parse(historyRaw);
+    const redFlag: RedFlagResult | null = redFlagRaw ? JSON.parse(redFlagRaw) : null;
+    body = { sessionId: currentSessionId, summary, history, ...(redFlag ? { redFlag } : {}) };
+  } else if (legacyAnswersRaw) {
+    body = { sessionId: currentSessionId, answers: JSON.parse(legacyAnswersRaw) };
+  } else {
+    window.location.href = '/consult.html';
+    return;
+  }
 
   const res = await fetch('/api/report/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ sessionId: currentSessionId, answers }),
+    body: JSON.stringify(body),
   });
 
   if (res.status === 401) { window.location.href = '/login.html'; return; }

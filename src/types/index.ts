@@ -66,7 +66,30 @@ export interface AnswerResponse {
 
 export interface ReportRequest {
   sessionId: string;
-  answers: Answer[];
+  // 신규 적응형 모드: summary + history 사용
+  summary?: ChatSummary;
+  history?: { role: 'user' | 'assistant'; content: string }[];
+  redFlag?: RedFlagResult;
+  // 레거시 호환: 정적 OPQRST 모드
+  answers?: Answer[];
+}
+
+export interface ChatSummary {
+  chiefComplaint?: string;
+  onset?: string;
+  duration?: string;
+  character?: string;
+  location?: string;
+  radiation?: string;
+  aggravating?: string;
+  relieving?: string;
+  painScale?: number;
+  associatedSymptoms?: string[];
+  previousSimilar?: string;
+  chronicConditions?: string[];
+  medications?: string;
+  questionsForDoctor?: string[];
+  narrativeSummary?: string;
 }
 
 export interface ReportResponse {

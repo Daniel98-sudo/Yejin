@@ -1,18 +1,17 @@
-import type {
-  Answer,
-  AnswerResponse,
-  Question,
-  RedFlagResult,
-  StartSessionResponse,
-} from '../types/index';
 import { requireAuth, authHeaders } from './auth-guard';
 
-const TOTAL_STEPS = 7;
-
-let sessionId = '';
-let answers: Answer[] = [];
-let currentStep = 0;
-let token = '';
+interface Turn { role: 'user' | 'assistant'; content: string }
+interface AssistantTurn {
+  assistantMessage: string;
+  inputType?: 'text' | 'choice' | 'multi-choice' | 'slider';
+  options?: string[];
+  min?: number;
+  max?: number;
+  placeholder?: string;
+  complete: boolean;
+  summary?: Record<string, unknown>;
+  redFlag?: { level: string; reason: string; action: string };
+}
 
 const messagesEl = document.getElementById('messages')!;
 const inputAreaEl = document.getElementById('input-area')!;
@@ -20,7 +19,13 @@ const progressEl = document.getElementById('progress')!;
 const stepLabelEl = document.getElementById('step-label')!;
 const overlay = document.getElementById('redflag-overlay')!;
 
-// ── Helpers ──────────────────────────────────────────────
+const TARGET_TURNS = 12; // 진행률 표시용 목표
+let history: Turn[] = [];
+let sessionId = '';
+
+function genSessionId(): string {
+  return `s_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
 
 function addBubble(text: string, who: 'ai' | 'user') {
   const div = document.createElement('div');
@@ -30,44 +35,39 @@ function addBubble(text: string, who: 'ai' | 'user') {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-function setProgress(step: number) {
-  const pct = Math.round((step / TOTAL_STEPS) * 100);
+function setProgress(turnsDone: number) {
+  const pct = Math.min(100, Math.round((turnsDone / TARGET_TURNS) * 100));
   progressEl.style.width = `${pct}%`;
-  stepLabelEl.textContent = `${step} / ${TOTAL_STEPS}`;
+  stepLabelEl.textContent = `${turnsDone} / ~${TARGET_TURNS}`;
 }
 
-function showRedFlagOverlay(rf: RedFlagResult, onContinue: () => void) {
-  if (rf.level === 'ROUTINE') { onContinue(); return; }
+function setLoading(on: boolean) {
+  if (on) inputAreaEl.innerHTML = '<div class="loading">잠시만요…</div>';
+}
 
+function showRedFlag(rf: AssistantTurn['redFlag'], onContinue: () => void) {
+  if (!rf || rf.level === 'ROUTINE') { onContinue(); return; }
   const icons: Record<string, string> = { EMERGENCY: '🚨', URGENT: '⚠️', WARNING: '📋' };
-  const titles: Record<string, string> = {
-    EMERGENCY: '응급 상황 감지',
-    URGENT: '빠른 진료 필요',
-    WARNING: '진료 권고',
-  };
-
+  const titles: Record<string, string> = { EMERGENCY: '응급 상황 감지', URGENT: '빠른 진료 필요', WARNING: '진료 권고' };
   overlay.classList.remove('hidden', 'EMERGENCY', 'URGENT', 'WARNING');
   overlay.classList.add(rf.level);
-  document.getElementById('flag-icon')!.textContent = icons[rf.level];
-  document.getElementById('flag-title')!.textContent = titles[rf.level];
+  document.getElementById('flag-icon')!.textContent = icons[rf.level] ?? '⚠️';
+  document.getElementById('flag-title')!.textContent = titles[rf.level] ?? '주의';
   document.getElementById('flag-reason')!.textContent = rf.reason;
   document.getElementById('flag-action')!.textContent = rf.action;
-
-  if (rf.level === 'EMERGENCY') {
-    document.getElementById('flag-119')!.classList.remove('hidden');
-  }
+  if (rf.level === 'EMERGENCY') document.getElementById('flag-119')!.classList.remove('hidden');
   document.getElementById('flag-continue')!.onclick = () => {
     overlay.classList.add('hidden');
     onContinue();
   };
 }
 
-// ── Input Renderers ───────────────────────────────────────
+// ── 입력 위젯 ────────────────────────────────────────────
 
-function renderTextInput(question: Question, onSubmit: (v: string) => void) {
+function renderText(t: AssistantTurn, onSubmit: (v: string) => void) {
   inputAreaEl.innerHTML = `
     <div class="text-input-wrap">
-      <textarea id="txt" rows="2" placeholder="${question.placeholder ?? ''}"></textarea>
+      <textarea id="txt" rows="2" placeholder="${t.placeholder ?? '편하게 말씀해 주세요'}"></textarea>
       <button class="send-btn" id="send-btn">→</button>
     </div>`;
   const txt = document.getElementById('txt') as HTMLTextAreaElement;
@@ -77,26 +77,75 @@ function renderTextInput(question: Question, onSubmit: (v: string) => void) {
   txt.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } };
 }
 
-function renderChoices(question: Question, onSubmit: (v: string) => void) {
+function renderChoice(t: AssistantTurn, onSubmit: (v: string) => void) {
   const div = document.createElement('div');
   div.className = 'choices';
-  (question.options ?? []).forEach((opt) => {
+  (t.options ?? []).forEach((opt) => {
     const btn = document.createElement('button');
+    btn.type = 'button';
     btn.className = 'choice-btn';
     btn.textContent = opt;
-    btn.onclick = () => onSubmit(opt);
+    btn.addEventListener('click', () => onSubmit(opt));
     div.appendChild(btn);
   });
   inputAreaEl.innerHTML = '';
   inputAreaEl.appendChild(div);
 }
 
-function renderSlider(question: Question, onSubmit: (v: number) => void) {
+function renderMultiChoice(t: AssistantTurn, onSubmit: (v: string[]) => void) {
+  const selected = new Set<string>();
+  const buttons = new Map<string, HTMLButtonElement>();
+  const div = document.createElement('div');
+  div.className = 'choices';
+
+  const sync = () => {
+    buttons.forEach((b, opt) => {
+      const isOn = selected.has(opt);
+      if (b.classList.contains('selected') !== isOn) b.classList.toggle('selected', isOn);
+    });
+  };
+
+  (t.options ?? []).forEach((opt) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'choice-btn';
+    btn.textContent = opt;
+    btn.addEventListener('click', () => {
+      if (opt === '해당 없음') {
+        if (selected.has('해당 없음')) selected.clear();
+        else { selected.clear(); selected.add('해당 없음'); }
+      } else {
+        selected.delete('해당 없음');
+        if (selected.has(opt)) selected.delete(opt); else selected.add(opt);
+      }
+      sync();
+    });
+    buttons.set(opt, btn);
+    div.appendChild(btn);
+  });
+
+  const confirm = document.createElement('button');
+  confirm.type = 'button';
+  confirm.className = 'btn btn-primary mt-16';
+  confirm.textContent = '선택 완료';
+  confirm.addEventListener('click', () => {
+    if (selected.size === 0) selected.add('해당 없음');
+    onSubmit([...selected]);
+  });
+
+  inputAreaEl.innerHTML = '';
+  inputAreaEl.appendChild(div);
+  inputAreaEl.appendChild(confirm);
+}
+
+function renderSlider(t: AssistantTurn, onSubmit: (v: number) => void) {
+  const min = t.min ?? 0;
+  const max = t.max ?? 10;
   inputAreaEl.innerHTML = `
     <div class="slider-wrap">
       <div class="slider-value" id="slider-val">5</div>
-      <input type="range" id="slider" min="${question.min ?? 0}" max="${question.max ?? 10}" value="5" />
-      <div class="slider-labels"><span>0 (없음)</span><span>10 (극심함)</span></div>
+      <input type="range" id="slider" min="${min}" max="${max}" value="5" />
+      <div class="slider-labels"><span>${min} (없음)</span><span>${max} (극심함)</span></div>
       <button class="btn btn-primary mt-16" id="slider-submit">이 점수로 제출</button>
     </div>`;
   const slider = document.getElementById('slider') as HTMLInputElement;
@@ -104,101 +153,73 @@ function renderSlider(question: Question, onSubmit: (v: number) => void) {
   document.getElementById('slider-submit')!.onclick = () => onSubmit(Number(slider.value));
 }
 
-function renderMultiChoice(question: Question, onSubmit: (v: string[]) => void) {
-  const selected = new Set<string>();
-  const div = document.createElement('div');
-  div.className = 'choices';
-  (question.options ?? []).forEach((opt) => {
-    const btn = document.createElement('button');
-    btn.className = 'choice-btn';
-    btn.textContent = opt;
-    btn.onclick = () => {
-      if (opt === '해당 없음') {
-        selected.clear();
-        div.querySelectorAll('.choice-btn').forEach((b) => b.classList.remove('selected'));
-        selected.add(opt);
-      } else {
-        selected.delete('해당 없음');
-        selected.has(opt) ? selected.delete(opt) : selected.add(opt);
-      }
-      btn.classList.toggle('selected', selected.has(opt));
-    };
-    div.appendChild(btn);
-  });
-  const confirmBtn = document.createElement('button');
-  confirmBtn.className = 'btn btn-primary mt-16';
-  confirmBtn.textContent = '선택 완료';
-  confirmBtn.onclick = () => {
-    if (selected.size === 0) selected.add('해당 없음');
-    onSubmit([...selected]);
-  };
-  inputAreaEl.innerHTML = '';
-  inputAreaEl.appendChild(div);
-  inputAreaEl.appendChild(confirmBtn);
-}
-
-// ── Core Flow ─────────────────────────────────────────────
-
-function renderQuestion(question: Question) {
-  addBubble(question.text, 'ai');
-  inputAreaEl.innerHTML = '';
-
-  const handleAnswer = async (value: string | number | string[]) => {
-    const displayValue = Array.isArray(value) ? value.join(', ') : String(value);
-    addBubble(displayValue, 'user');
-    inputAreaEl.innerHTML = '<div class="loading">다음 질문을 불러오는 중...</div>';
-
-    answers = [...answers, { questionId: question.id, questionText: question.text, value }];
-    currentStep += 1;
-    setProgress(currentStep);
-
-    const res = await fetch('/api/consultation/answer', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ sessionId, answers, currentStep }),
-    });
-
-    if (res.status === 401) { window.location.href = '/login.html'; return; }
-
-    const data: AnswerResponse = await res.json();
-
-    if (data.complete || !data.nextQuestion) {
-      inputAreaEl.innerHTML = '';
-      showRedFlagOverlay(data.redFlag, goToReport);
-    } else {
-      showRedFlagOverlay(data.redFlag, () => renderQuestion(data.nextQuestion!));
-    }
-  };
-
-  switch (question.type) {
-    case 'text': renderTextInput(question, (v) => handleAnswer(v)); break;
-    case 'choice': renderChoices(question, (v) => handleAnswer(v)); break;
-    case 'slider': renderSlider(question, (v) => handleAnswer(v)); break;
-    case 'multi-choice': renderMultiChoice(question, (v) => handleAnswer(v)); break;
+function renderInput(t: AssistantTurn, onAnswer: (display: string, raw: string | number | string[]) => void) {
+  switch (t.inputType) {
+    case 'choice': renderChoice(t, (v) => onAnswer(v, v)); break;
+    case 'multi-choice': renderMultiChoice(t, (v) => onAnswer(v.join(', '), v)); break;
+    case 'slider': renderSlider(t, (v) => onAnswer(`${v}/10`, v)); break;
+    case 'text':
+    default: renderText(t, (v) => onAnswer(v, v));
   }
 }
 
-function goToReport() {
-  sessionStorage.setItem('yejin_answers', JSON.stringify(answers));
-  sessionStorage.setItem('yejin_session_id', sessionId);
-  window.location.href = '/report.html';
+// ── Core Loop ───────────────────────────────────────────
+
+async function callTurn(): Promise<AssistantTurn | null> {
+  const res = await fetch('/api/chat/turn', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ sessionId, history, turnCount: history.filter((t) => t.role === 'user').length }),
+  });
+  if (res.status === 401) { window.location.href = '/login.html'; return null; }
+  if (!res.ok) {
+    inputAreaEl.innerHTML = '<div style="color:#dc2626; padding:16px;">AI 응답 실패. 새로고침 후 다시 시도해주세요.</div>';
+    return null;
+  }
+  return res.json();
 }
 
-// ── Init ──────────────────────────────────────────────────
+async function nextTurn() {
+  setLoading(true);
+  const t = await callTurn();
+  if (!t) return;
+
+  addBubble(t.assistantMessage, 'ai');
+  history.push({ role: 'assistant', content: t.assistantMessage });
+  setProgress(history.filter((h) => h.role === 'user').length);
+
+  if (t.complete) {
+    finalize(t);
+    return;
+  }
+
+  renderInput(t, async (display, raw) => {
+    addBubble(display, 'user');
+    history.push({ role: 'user', content: typeof raw === 'string' ? raw : JSON.stringify(raw) });
+    setProgress(history.filter((h) => h.role === 'user').length);
+    await nextTurn();
+  });
+}
+
+function finalize(t: AssistantTurn) {
+  inputAreaEl.innerHTML = '<div class="loading">예진 보고서를 만드는 중…</div>';
+  sessionStorage.setItem('yejin_session_id', sessionId);
+  sessionStorage.setItem('yejin_chat_history', JSON.stringify(history));
+  sessionStorage.setItem('yejin_chat_summary', JSON.stringify(t.summary ?? {}));
+  sessionStorage.setItem('yejin_chat_redflag', JSON.stringify(t.redFlag ?? null));
+
+  showRedFlag(t.redFlag, () => { window.location.href = '/report.html'; });
+  // 응급 아닌 경우 약간 지연 후 자동 이동
+  if (!t.redFlag || t.redFlag.level === 'ROUTINE') {
+    setTimeout(() => { window.location.href = '/report.html'; }, 800);
+  }
+}
 
 async function init() {
-  token = await requireAuth();
+  await requireAuth();
+  sessionId = genSessionId();
   setProgress(0);
-
-  const res = await fetch('/api/consultation/start', {
-    method: 'POST',
-    headers: { ...authHeaders() },
-  });
-  if (res.status === 401) { window.location.href = '/login.html'; return; }
-
-  const data: StartSessionResponse = await res.json();
-  sessionId = data.sessionId;
-  renderQuestion(data.firstQuestion);
+  await nextTurn();
 }
 
 init();

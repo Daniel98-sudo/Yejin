@@ -72,17 +72,37 @@ export interface SessionFeatures {
   medicationChanges: string;
 }
 
+export interface ConversationTurn {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ExtendedFeatures {
+  duration?: string;
+  character?: string;
+  location?: string;
+  radiation?: string;
+  aggravating?: string;
+  relieving?: string;
+  previousSimilar?: string;
+  chronicConditions?: string[];
+  medications?: string;
+  narrativeSummary?: string;
+}
+
 export interface SessionRecord {
   uid: string;
   createdAt: Timestamp;
   date: string; // YYYY-MM-DD
-  weekKey: string; // YYYY-W## (ISO 주간 키)
+  weekKey: string;
   answers: SessionAnswer[];
   features: SessionFeatures;
+  extendedFeatures?: ExtendedFeatures;
+  conversationHistory?: ConversationTurn[]; // AI 적응형 모드의 전체 대화
   redFlagLevel: string;
   redFlagReason: string;
   redFlagAction: string;
-  painScale: number; // features.painScale 중복 저장 (인덱스·호환성)
+  painScale: number;
   algorithmVersion: string;
   aiModel: string;
   appVersion: string;

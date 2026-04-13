@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>예진이 — 내 문진 기록</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    .hcard { background:white; border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:12px; cursor:pointer; transition: border-color .15s; }
+    .hcard:hover { border-color: var(--primary); }
+    .hcard-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+    .hcard-date { font-size:13px; color:var(--text-muted); }
+    .hcard-title { font-size:15px; font-weight:600; color:#0f172a; margin:4px 0; }
+    .hcard-sub { font-size:13px; color:#334155; }
+    .hdetail { display:none; margin-top:14px; padding-top:14px; border-top:1px solid var(--border); }
+    .hdetail.open { display:block; }
+    .hdetail .report-section { margin-bottom:10px; }
+    .hdetail .report-section h3 { font-size:13px; color:var(--text-muted); margin:0 0 4px 0; font-weight:600; }
+    .hdetail .report-section p, .hdetail .report-section li { font-size:14px; color:#0f172a; line-height:1.5; }
+    .hdetail .report-section ul { padding-left:18px; margin:4px 0; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 0;">
+      <h1 style="margin:0; font-size:20px;">📋 내 문진 기록</h1>
+      <a href="/consult.html" style="font-size:13px; color:var(--text-muted); text-decoration:none;">← 돌아가기</a>
+    </div>
+
+    <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">
+      최근 90일 이내의 문진 기록을 확인할 수 있어요. 카드를 누르면 자세한 내용이 펼쳐집니다.
+    </p>
+
+    <div id="loading" class="loading">불러오는 중...</div>
+    <div id="list-container" class="hidden"></div>
+  </div>
+
+  <script src="/js/history.js"></script>
+  <script src="/js/footer.js"></script>
+</body>
+</html>
