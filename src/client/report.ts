@@ -139,7 +139,14 @@ async function init() {
   }
 
   if (!res.ok) {
-    loadingEl.textContent = '보고서 생성에 실패했습니다. 다시 시도해주세요.';
+    const errBody = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    loadingEl.innerHTML = `
+      <div style="color:#dc2626; text-align:center; padding:24px;">
+        <strong>보고서 생성 실패</strong><br/>
+        <span style="font-size:13px; color:var(--text-muted);">${errBody.error ?? '알 수 없는 오류'}</span><br/><br/>
+        <button onclick="location.reload()" class="btn btn-primary" style="width:auto; padding:10px 24px;">다시 시도</button>
+        <a href="/consult.html" style="display:block; margin-top:10px; color:var(--text-muted); font-size:13px;">처음으로</a>
+      </div>`;
     return;
   }
 

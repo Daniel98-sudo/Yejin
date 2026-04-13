@@ -98,6 +98,61 @@ async function analyzeQuestionnaire(tsv: string, flowKey: string): Promise<Analy
   throw lastErr ?? new Error('Gemini 분석 실패');
 }
 
+function fallbackAnalysisFromAnswers(qAnswers: QAnswer[]): AnalysisResult {
+  const byId: Record<string, QAnswer> = Object.fromEntries(qAnswers.map((a) => [a.questionId, a]));
+  const v = (id: string): string => {
+    const a = byId[id]; if (!a) return '';
+    if (Array.isArray(a.rawValue)) return a.rawValue.join(', ');
+    return String(a.rawValue ?? '');
+  };
+  const arr = (id: string): string[] => {
+    const a = byId[id]; if (!a) return [];
+    return Array.isArray(a.rawValue) ? a.rawValue.filter((x) => x !== '해당 없음') : [];
+  };
+  const pain = Number(byId['pain_scale']?.rawValue ?? 0) || 0;
+
+  const detail = v('chief_complaint_detail');
+  const category = v('chief_complaint_category');
+  const onset = v('onset');
+
+  const associated = [
+    ...arr('h_associated'), ...arr('c_associated'), ...arr('a_associated'),
+    ...arr('r_associated'), ...arr('d_associated'), ...arr('f_associated'),
+    ...arr('m_associated'), ...arr('sk_systemic'), ...arr('u_associated'),
+  ].filter(Boolean);
+
+  const chronic = arr('chronic_conditions').join(', ');
+  const meds = v('medications');
+  const userQuestion = v('questions_for_doctor');
+
+  const questions: string[] = [];
+  if (userQuestion) questions.push(userQuestion);
+  questions.push('현재 증상의 가장 가능성 있는 원인은 무엇인가요?');
+  questions.push('어떤 추가 검사가 필요할까요?');
+
+  // 간단 redFlag — 이미 클라이언트에서 즉시 응급 룰 평가하지만 서버에서도 보수적으로
+  let level: AnalysisResult['redFlag']['level'] = 'ROUTINE';
+  let reason = '추가 평가 없음';
+  let action = '필요 시 진료를 받으세요.';
+  if (pain >= 9) { level = 'URGENT'; reason = '극심한 통증 (NRS 9 이상)'; action = '빠른 시일 내 진료를 받으세요.'; }
+  if (associated.some((s) => ['한쪽 팔다리 힘 빠짐', '말이 어눌해짐', '의식이 흐려짐', '식은땀'].includes(s))) {
+    level = 'EMERGENCY'; reason = '응급 동반 증상 감지'; action = '즉시 119 또는 응급실로 가세요.';
+  }
+
+  return {
+    chiefComplaint: detail || category || '증상 정보',
+    onset: onset || '미상',
+    painScale: pain,
+    associatedSymptoms: associated,
+    previousHistory: chronic || '특이 사항 없음',
+    medicationChanges: meds || '없음',
+    questionsForDoctor: questions,
+    narrativeSummary: `[자동 요약] ${category}. ${detail}. 발병: ${onset}. 통증 ${pain}/10. 동반: ${associated.join(', ') || '없음'}. (AI 분석 일시 실패로 raw 데이터 기반 요약)`,
+    differentialHints: [],
+    redFlag: { level, reason, action },
+  };
+}
+
 function questionnaireToSessionAnswers(answers: QAnswer[]): SessionAnswer[] {
   return answers.map((a) => ({
     questionId: a.questionId,
@@ -284,8 +339,14 @@ export async function POST(req: Request): Promise<Response> {
   let conversationHistory: ConversationTurn[] | undefined;
 
   if (body.mode === 'questionnaire' && body.tsv && body.flowKey && body.questionnaireAnswers) {
-    // ── 정형 문진 모드 (단 1회 Gemini 분석)
-    const analysis = await analyzeQuestionnaire(body.tsv, body.flowKey);
+    // ── 정형 문진 모드: Gemini 분석 → 실패 시 raw answers 로 fallback
+    let analysis: AnalysisResult;
+    try {
+      analysis = await analyzeQuestionnaire(body.tsv, body.flowKey);
+    } catch (e) {
+      console.error('[generate] analysis failed, using fallback:', e instanceof Error ? e.message : e);
+      analysis = fallbackAnalysisFromAnswers(body.questionnaireAnswers);
+    }
     const built = buildFromAnalysis(analysis, body.questionnaireAnswers);
     features = built.features;
     extendedFeatures = built.extendedFeatures;
