@@ -1,5 +1,5 @@
-import { initFirebase, logout } from '../../lib/firebase-client';
-import { getFirebaseAuth } from '../../lib/firebase-client';
+import { initFirebase, getFirebaseAuth, logout } from '../../lib/firebase-client';
+import { onAuthStateChanged } from 'firebase/auth';
 
 const FLAG_COLORS: Record<string, string> = {
   EMERGENCY: '#dc2626',
@@ -10,7 +10,6 @@ const FLAG_COLORS: Record<string, string> = {
 
 let currentOffset = 0;
 const PAGE_SIZE = 20;
-let totalSessions = 0;
 let adminToken = '';
 
 function adminHeaders() {
@@ -20,6 +19,7 @@ function adminHeaders() {
 async function loadStats() {
   const res = await fetch('/api/admin/stats', { headers: adminHeaders() });
   if (res.status === 403) { window.location.href = '/admin/login.html'; return; }
+
   const data = await res.json() as {
     totalSessions: number;
     totalConsentedUsers: number;
@@ -27,21 +27,19 @@ async function loadStats() {
     redFlagBreakdown: Record<string, number>;
   };
 
-  totalSessions = data.totalSessions;
   document.getElementById('stat-total')!.textContent = String(data.totalSessions);
   document.getElementById('stat-users')!.textContent = String(data.totalConsentedUsers);
   document.getElementById('stat-recent')!.textContent = String(data.recentSessions7d);
   document.getElementById('stat-emergency')!.textContent = String(data.redFlagBreakdown['EMERGENCY'] ?? 0);
 
-  // Red Flag 분포 바 차트
-  const chartEl = document.getElementById('flag-chart')!;
   const total = Object.values(data.redFlagBreakdown).reduce((a, b) => a + b, 0) || 1;
-  chartEl.innerHTML = Object.entries(data.redFlagBreakdown).map(([level, count]) => `
-    <div class="flag-bar">
-      <span style="width:90px; color:${FLAG_COLORS[level]}; font-weight:600;">${level}</span>
-      <div class="bar"><div class="fill" style="width:${Math.round((count/total)*100)}%; background:${FLAG_COLORS[level]};"></div></div>
-      <span style="width:40px; text-align:right; color:var(--text-muted);">${count}</span>
-    </div>`).join('');
+  document.getElementById('flag-chart')!.innerHTML = Object.entries(data.redFlagBreakdown)
+    .map(([level, count]) => `
+      <div class="flag-bar">
+        <span style="width:90px;color:${FLAG_COLORS[level]};font-weight:600;">${level}</span>
+        <div class="bar"><div class="fill" style="width:${Math.round((count/total)*100)}%;background:${FLAG_COLORS[level]};"></div></div>
+        <span style="width:40px;text-align:right;color:var(--text-muted);">${count}</span>
+      </div>`).join('');
 }
 
 async function loadSessions(offset: number) {
@@ -54,15 +52,14 @@ async function loadSessions(offset: number) {
   };
 
   document.getElementById('total-badge')!.textContent = `(총 ${data.total}건)`;
-
   const tbody = document.getElementById('sessions-table')!;
   tbody.innerHTML = data.sessions.map((s) => `
     <tr>
       <td>${s.date ?? '-'}</td>
-      <td style="font-family:monospace; color:var(--text-muted);">${s.uid?.slice(0,8) ?? '-'}...</td>
+      <td style="font-family:monospace;color:var(--text-muted);">${(s.uid ?? '').slice(0, 8)}...</td>
       <td>${s.painScale ?? '-'}</td>
       <td><span class="badge badge-${s.redFlagLevel}">${s.redFlagLevel}</span></td>
-    </tr>`).join('') || '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">데이터 없음</td></tr>';
+    </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">데이터 없음</td></tr>';
 
   (document.getElementById('prev-btn') as HTMLButtonElement).disabled = offset === 0;
   (document.getElementById('next-btn') as HTMLButtonElement).disabled = offset + PAGE_SIZE >= data.total;
@@ -70,34 +67,40 @@ async function loadSessions(offset: number) {
 
 async function init() {
   await initFirebase();
-
   const auth = getFirebaseAuth();
-  const user = auth.currentUser;
-  if (!user) { window.location.href = '/admin/login.html'; return; }
 
-  const tokenResult = await user.getIdTokenResult(true);
-  const role = tokenResult.claims['role'];
-  if (role !== 'superadmin' && role !== 'hospital') {
-    window.location.href = '/admin/login.html';
-    return;
-  }
+  // auth 상태 복원을 기다린 후 권한 확인
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      window.location.href = '/admin/login.html';
+      return;
+    }
 
-  adminToken = await user.getIdToken();
+    const tokenResult = await user.getIdTokenResult(true);
+    const role = tokenResult.claims['role'];
 
-  document.getElementById('logout-btn')!.addEventListener('click', () => logout());
-  document.getElementById('prev-btn')!.addEventListener('click', async () => {
-    currentOffset = Math.max(0, currentOffset - PAGE_SIZE);
-    await loadSessions(currentOffset);
+    if (role !== 'superadmin' && role !== 'hospital') {
+      window.location.href = '/admin/login.html';
+      return;
+    }
+
+    adminToken = await user.getIdToken();
+
+    document.getElementById('logout-btn')!.addEventListener('click', () => logout());
+    document.getElementById('prev-btn')!.addEventListener('click', async () => {
+      currentOffset = Math.max(0, currentOffset - PAGE_SIZE);
+      await loadSessions(currentOffset);
+    });
+    document.getElementById('next-btn')!.addEventListener('click', async () => {
+      currentOffset += PAGE_SIZE;
+      await loadSessions(currentOffset);
+    });
+
+    await Promise.all([loadStats(), loadSessions(0)]);
+
+    document.getElementById('loading')!.classList.add('hidden');
+    document.getElementById('dashboard')!.classList.remove('hidden');
   });
-  document.getElementById('next-btn')!.addEventListener('click', async () => {
-    currentOffset += PAGE_SIZE;
-    await loadSessions(currentOffset);
-  });
-
-  await Promise.all([loadStats(), loadSessions(0)]);
-
-  document.getElementById('loading')!.classList.add('hidden');
-  document.getElementById('dashboard')!.classList.remove('hidden');
 }
 
 init();
