@@ -181,16 +181,15 @@ async function viewCert(uid: string) {
 
   const res = await fetch(`/api/admin/hospital-cert?uid=${encodeURIComponent(uid)}`, { headers: adminHeaders() });
   if (!res.ok) { preview.innerHTML = '서류 로드 실패'; return; }
-  const data = await res.json() as { businessCertBase64: string };
-  const src = data.businessCertBase64;
+  const data = await res.json() as { url: string; contentType: string };
 
-  if (src.startsWith('data:image/')) {
-    preview.innerHTML = `<img src="${src}" style="max-width:100%; max-height:400px; border-radius:4px;" />`;
-  } else if (src.startsWith('data:application/pdf')) {
-    preview.innerHTML = `<iframe src="${src}" style="width:100%; height:500px; border:none;"></iframe>
-      <a href="${src}" download="business-cert.pdf" style="display:block; margin-top:6px; font-size:12px; color:#2563eb;">📥 PDF 다운로드</a>`;
+  if (data.contentType.startsWith('image/')) {
+    preview.innerHTML = `<img src="${data.url}" style="max-width:100%; max-height:400px; border-radius:4px;" />`;
+  } else if (data.contentType === 'application/pdf') {
+    preview.innerHTML = `<iframe src="${data.url}" style="width:100%; height:500px; border:none;"></iframe>
+      <a href="${data.url}" target="_blank" rel="noopener" style="display:block; margin-top:6px; font-size:12px; color:#2563eb;">📥 새 탭에서 열기</a>`;
   } else {
-    preview.innerHTML = `<a href="${src}" download>파일 다운로드</a>`;
+    preview.innerHTML = `<a href="${data.url}" target="_blank" rel="noopener">파일 다운로드</a>`;
   }
 }
 

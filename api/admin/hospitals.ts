@@ -14,8 +14,8 @@ export async function GET(req: Request): Promise<Response> {
 
   try {
     const list = await listPendingHospitals();
-    // businessCertBase64 는 개별 조회 시에만 반환 — 목록 응답 크기 제한
-    const summary = list.map(({ businessCertBase64, ...rest }) => rest);
+    // Storage 경로는 별도 엔드포인트에서 서명 URL로 제공 — 목록엔 제외
+    const summary = list.map(({ businessCertPath, ...rest }) => rest);
     return Response.json({ hospitals: summary });
   } catch (e) {
     const err = e as { message?: string };

@@ -77,7 +77,8 @@ export async function saveSession(record: SessionRecord): Promise<string> {
  * hospitals/{uid}/
  *   - email: string
  *   - name: string (병원명)
- *   - businessCertBase64: string (사업자등록증 원본 파일, data URL)
+ *   - businessCertPath: string (Firebase Storage 경로 — 원본 파일은 Storage에 저장)
+ *   - businessCertContentType: string
  *   - status: 'pending' | 'approved' | 'rejected'
  *   - createdAt: Timestamp
  *   - reviewedAt?: Timestamp
@@ -88,7 +89,8 @@ export type HospitalStatus = 'pending' | 'approved' | 'rejected';
 export interface HospitalRecord {
   email: string;
   name: string;
-  businessCertBase64: string;
+  businessCertPath: string;
+  businessCertContentType: string;
   status: HospitalStatus;
   createdAt: Timestamp;
   reviewedAt?: Timestamp;
@@ -97,7 +99,7 @@ export interface HospitalRecord {
 
 export async function createHospitalRecord(
   uid: string,
-  data: { email: string; name: string; businessCertBase64: string }
+  data: { email: string; name: string; businessCertPath: string; businessCertContentType: string }
 ): Promise<void> {
   const db = getDb();
   await db.collection('hospitals').doc(uid).set({

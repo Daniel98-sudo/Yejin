@@ -1,9 +1,10 @@
 /**
  * GET /api/admin/hospital-cert?uid=...
- * Superadmin 전용 — 병원의 사업자등록증 원본 data URL 반환 (승인 전 확인용)
+ * Superadmin 전용 — 병원 사업자등록증의 임시 서명 URL 반환 (1시간 만료)
  */
 import { verifyAdminToken } from '../../src/lib/admin-auth';
 import { getHospitalRecord } from '../../src/lib/firestore';
+import { getSignedUrl } from '../../src/lib/storage';
 
 export async function GET(req: Request): Promise<Response> {
   const admin = await verifyAdminToken(req, 'superadmin');
@@ -16,5 +17,12 @@ export async function GET(req: Request): Promise<Response> {
   const record = await getHospitalRecord(uid);
   if (!record) return Response.json({ error: 'Not found' }, { status: 404 });
 
-  return Response.json({ businessCertBase64: record.businessCertBase64, name: record.name, email: record.email });
+  const signedUrl = await getSignedUrl(record.businessCertPath);
+
+  return Response.json({
+    url: signedUrl,
+    contentType: record.businessCertContentType,
+    name: record.name,
+    email: record.email,
+  });
 }
