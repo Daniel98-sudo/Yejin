@@ -3,11 +3,14 @@ import { logout } from '../lib/firebase-client';
 
 function formatResetDate(ms: number): string {
   const d = new Date(ms);
-  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
-  const y = kst.getUTCFullYear();
-  const m = String(kst.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(kst.getUTCDate()).padStart(2, '0');
-  return `${y}년 ${m}월 ${day}일 (월) 00:00 (KST)`;
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+  return `${m}월 ${day}일 월요일`;
+}
+
+function daysUntil(ms: number): number {
+  const diff = ms - Date.now();
+  return Math.max(0, Math.ceil(diff / (24 * 60 * 60 * 1000)));
 }
 
 async function init() {
@@ -20,13 +23,17 @@ async function init() {
   }
   const data = await res.json() as { remaining: number; limit: number; used: number; resetAt: number };
 
-  document.getElementById('quota-num')!.textContent = `${data.remaining} / ${data.limit}`;
-  document.getElementById('quota-reset')!.textContent = `다음 리셋: ${formatResetDate(data.resetAt)}`;
+  document.getElementById('quota-num')!.textContent = `${data.remaining}번`;
+
+  const days = daysUntil(data.resetAt);
+  const dayText = days === 0 ? '오늘 밤 자정 이후' : `${days}일 뒤`;
+  document.getElementById('quota-reset')!.textContent =
+    `${dayText}(${formatResetDate(data.resetAt)})부터 다시 3번 사용하실 수 있어요.`;
 
   const startBtn = document.getElementById('start-btn') as HTMLButtonElement;
   if (data.remaining <= 0) {
     startBtn.disabled = true;
-    startBtn.textContent = '이번 주 횟수 모두 사용';
+    startBtn.textContent = '이번 주 횟수를 모두 쓰셨어요';
     startBtn.style.opacity = '0.5';
   } else {
     startBtn.addEventListener('click', () => { window.location.href = '/chat.html'; });

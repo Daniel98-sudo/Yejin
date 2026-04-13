@@ -6,10 +6,12 @@
   <title>예진이 — 문진 시작</title>
   <link rel="stylesheet" href="/css/styles.css" />
   <style>
-    .quota-card { background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:20px; text-align:center; margin-bottom:16px; }
-    .quota-num { font-size:42px; font-weight:800; color:#2563eb; line-height:1; }
-    .quota-label { font-size:14px; color:#1e3a5f; margin-top:8px; }
-    .quota-detail { font-size:12px; color:#64748b; margin-top:10px; }
+    .quota-card { background:#eff6ff; border:1px solid #bfdbfe; border-radius:14px; padding:24px 20px; text-align:center; margin-bottom:16px; }
+    .quota-num { font-size:54px; font-weight:800; color:#2563eb; line-height:1; }
+    .quota-label { font-size:17px; color:#1e3a5f; margin-top:10px; font-weight:600; }
+    .quota-detail { font-size:14px; color:#475569; margin-top:12px; line-height:1.5; }
+    .info-box { background:#fefce8; border:1px solid #fef3c7; color:#713f12; border-radius:12px; padding:16px 18px; font-size:15px; line-height:1.6; }
+    .info-box strong { color:#b45309; }
   </style>
 </head>
 <body>
@@ -17,26 +19,26 @@
     <div class="header">
       <div class="logo">🩺</div>
       <h1>문진 시작하기</h1>
-      <p>OPQRST 기반 예진 · 약 2분 소요</p>
+      <p>병원 가기 전 몇 가지 여쭤볼게요 · 2분이면 충분해요</p>
     </div>
 
     <div id="quota-view" style="padding-top:16px;">
       <div class="quota-card">
         <div id="quota-num" class="quota-num">-</div>
-        <div class="quota-label">이번 주 문진 작성 남은 횟수</div>
+        <div class="quota-label">이번 주에 남은 문진 횟수예요</div>
         <div id="quota-reset" class="quota-detail"></div>
       </div>
 
-      <div class="disclaimer" style="background:#fefce8; border-color:#fef3c7; color:#713f12; font-size:13px;">
-        한 계정당 <strong>주 3회</strong>까지 문진표를 작성할 수 있습니다.<br/>
-        문진표를 완성하면 1회가 차감되며, <strong>매주 월요일 00:00</strong>에 3회로 리셋됩니다.
+      <div class="info-box">
+        한 분당 <strong>일주일에 3번</strong>까지 문진을 받으실 수 있어요.<br/>
+        문진을 다 마치시면 한 번이 사용되고, <strong>다음 주 월요일 아침</strong>에 다시 3번으로 새로 시작해요.
       </div>
     </div>
 
     <div style="flex:1"></div>
 
     <div style="padding-bottom:16px;">
-      <button id="start-btn" class="btn btn-primary" style="width:100%;">문진 시작하기 →</button>
+      <button id="start-btn" class="btn btn-primary" style="width:100%; font-size:17px; padding:16px;">문진 시작하기 →</button>
       <button id="logout-btn" class="btn btn-ghost" style="width:100%; margin-top:10px;">로그아웃</button>
     </div>
 
