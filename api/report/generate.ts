@@ -1,9 +1,14 @@
 import { verifyIdToken } from '../../src/lib/firebase-admin';
 import { evaluateRedFlag } from '../../src/lib/redflag';
 import { saveSessionWithId, getSessionById } from '../../src/lib/firestore';
-import { getWeeklyQuota } from '../../src/lib/quota';
+import { getWeeklyQuota, currentWeekKey } from '../../src/lib/quota';
+import { getQuestion } from '../../src/lib/opqrst';
 import { Timestamp } from 'firebase-admin/firestore';
 import type { Answer, ReportRequest, ReportResponse, ReportSection } from '../../src/types/index';
+import type { SessionAnswer, SessionFeatures } from '../../src/lib/firestore';
+
+const APP_VERSION = '2026.04';
+const AI_MODEL = 'gemini-flash-latest';
 
 function buildPrompt(answers: Answer[]): string {
   const lines = answers.map((a) => {
@@ -11,6 +16,45 @@ function buildPrompt(answers: Answer[]): string {
     return `- ${a.questionText}: ${value}`;
   });
   return `다음은 환자의 문진 답변입니다:\n${lines.join('\n')}\n\n위 내용을 바탕으로 예진 보고서 JSON을 생성해주세요.`;
+}
+
+function normalizeAnswer(a: Answer): SessionAnswer {
+  // opqrst 질문지에서 step 검색하여 type 보강
+  const q = Array.from({ length: 10 }, (_, i) => getQuestion(i)).find((qq) => qq?.id === a.questionId);
+  return {
+    questionId: a.questionId,
+    questionText: a.questionText,
+    type: q?.type ?? 'text',
+    value: a.value,
+  };
+}
+
+function str(v: string | number | string[] | undefined): string {
+  if (v == null) return '';
+  if (Array.isArray(v)) return v.join(', ');
+  return String(v);
+}
+function num(v: string | number | string[] | undefined): number {
+  if (typeof v === 'number') return v;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+function arr(v: string | number | string[] | undefined): string[] {
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'string' && v.length) return [v];
+  return [];
+}
+
+function extractFeatures(answers: Answer[]): SessionFeatures {
+  const byId = Object.fromEntries(answers.map((a) => [a.questionId, a.value]));
+  return {
+    chiefComplaint: str(byId['chief_complaint']),
+    onset: str(byId['onset']),
+    painScale: num(byId['pain_scale']),
+    associatedSymptoms: arr(byId['associated_symptoms']),
+    previousHistory: str(byId['previous_history']),
+    medicationChanges: str(byId['medication_changes']),
+  };
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -29,21 +73,22 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: 'sessionId 및 answers 가 필요합니다.' }, { status: 400 });
   }
 
-  // 이미 저장된 세션이면 리포트 재사용 (새로고침 시 중복 차감 방지)
+  // 중복 차감 방지
   const existing = await getSessionById(sessionId);
   if (existing?.report) {
     return Response.json({ report: existing.report as ReportSection } satisfies ReportResponse);
   }
 
-  // 이번 주 쿼터 체크 — 3회 초과 시 차단
+  // 쿼터 체크
   const quota = await getWeeklyQuota(uid);
   if (quota.remaining <= 0) {
     return Response.json({
-      error: '이번 주 문진 작성 횟수(3회)를 모두 사용했습니다.',
+      error: '이번 주 문진 작성 횟수를 모두 사용했습니다.',
       quota,
     }, { status: 429 });
   }
 
+  // Gemini 호출
   const authHeader = req.headers.get('Authorization') ?? '';
   const parseRes = await fetch(`${getBaseUrl(req)}/api/proxy/parse`, {
     method: 'POST',
@@ -57,22 +102,28 @@ export async function POST(req: Request): Promise<Response> {
   };
 
   const redFlag = evaluateRedFlag(answers);
+  const features = extractFeatures(answers);
   const report: ReportSection = {
     ...result,
     redFlag,
     generatedAt: new Date().toISOString(),
-    algorithmVersion: '2026.04',
+    algorithmVersion: APP_VERSION,
   };
 
-  // 세션 + 리포트 저장 (병원 공유 대비 — §28조의2 필수 동의)
   await saveSessionWithId(sessionId, {
     uid,
     createdAt: Timestamp.now(),
     date: new Date().toISOString().split('T')[0],
-    answers: answers.map((a) => ({ questionId: a.questionId, value: a.value })),
+    weekKey: currentWeekKey(),
+    answers: answers.map(normalizeAnswer),
+    features,
     redFlagLevel: redFlag.level,
-    painScale: Number(answers.find((a) => a.questionId === 'pain_scale')?.value ?? 0),
-    algorithmVersion: '2026.04',
+    redFlagReason: redFlag.reason,
+    redFlagAction: redFlag.action,
+    painScale: features.painScale,
+    algorithmVersion: APP_VERSION,
+    aiModel: AI_MODEL,
+    appVersion: APP_VERSION,
     report,
   });
 

@@ -95,6 +95,10 @@ async function init() {
     adminToken = await user.getIdToken();
 
     document.getElementById('logout-btn')!.addEventListener('click', () => logout());
+    document.getElementById('search-btn')!.addEventListener('click', searchUser);
+    document.getElementById('search-email')!.addEventListener('keydown', (e) => {
+      if ((e as KeyboardEvent).key === 'Enter') searchUser();
+    });
     document.getElementById('prev-btn')!.addEventListener('click', async () => {
       currentOffset = Math.max(0, currentOffset - PAGE_SIZE);
       await loadSessions(currentOffset).catch(showError);
@@ -210,6 +214,127 @@ async function reviewHospital(uid: string, action: 'approve' | 'reject') {
   }
 
   await loadHospitals();
+}
+
+// ─── 환자 검색 / 쿼터 관리 ────────────────────────────────
+
+interface UserSearchResult {
+  user: {
+    uid: string;
+    email: string;
+    emailVerified: boolean;
+    createdAt: string;
+    lastSignInAt?: string;
+    disabled: boolean;
+    providers: string[];
+    customClaims: Record<string, unknown>;
+  };
+  quota: { used: number; limit: number; baseLimit: number; bonus: number; remaining: number; weekKey: string };
+  sessionCount: number;
+}
+
+let lastSearchedUid = '';
+
+async function searchUser() {
+  const email = (document.getElementById('search-email') as HTMLInputElement).value.trim().toLowerCase();
+  const result = document.getElementById('search-result')!;
+  if (!email) { result.innerHTML = ''; return; }
+
+  result.innerHTML = '<div style="color:var(--text-muted); font-size:13px;">검색 중...</div>';
+  const res = await fetch(`/api/admin/user-search?email=${encodeURIComponent(email)}`, { headers: adminHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'HTTP ' + res.status }));
+    result.innerHTML = `<div style="color:#dc2626; font-size:13px; padding:10px; background:#fef2f2; border-radius:6px;">${err.error ?? '검색 실패'}</div>`;
+    return;
+  }
+  const data = await res.json() as UserSearchResult;
+  lastSearchedUid = data.user.uid;
+
+  const role = (data.user.customClaims['role'] as string) ?? '환자';
+  result.innerHTML = `
+    <div style="border:1px solid var(--border); border-radius:10px; padding:14px; background:#f8fafc;">
+      <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:10px;">
+        <div>
+          <div style="font-weight:600; font-size:14px;">${data.user.email}</div>
+          <div style="font-size:11px; color:var(--text-muted); font-family:monospace;">${data.user.uid}</div>
+        </div>
+        <div style="font-size:11px; text-align:right; color:var(--text-muted);">
+          역할: <strong>${role}</strong><br/>
+          ${data.user.emailVerified ? '✅ 인증됨' : '❌ 미인증'}
+          ${data.user.disabled ? ' · 🚫 비활성' : ''}
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; padding:10px; background:white; border-radius:6px; font-size:13px; margin-bottom:10px;">
+        <div><div style="color:var(--text-muted); font-size:11px;">이번주 사용</div><strong>${data.quota.used} / ${data.quota.limit}</strong></div>
+        <div><div style="color:var(--text-muted); font-size:11px;">남은 횟수</div><strong>${data.quota.remaining}번</strong></div>
+        <div><div style="color:var(--text-muted); font-size:11px;">추가 부여</div><strong>+${data.quota.bonus}</strong></div>
+      </div>
+
+      <div style="display:flex; gap:6px; margin-bottom:10px;">
+        <button class="btn-bonus" data-amount="1" style="padding:6px 12px; font-size:12px; background:#16a34a; color:white; border:none; border-radius:6px; cursor:pointer;">+1 부여</button>
+        <button class="btn-bonus" data-amount="3" style="padding:6px 12px; font-size:12px; background:#16a34a; color:white; border:none; border-radius:6px; cursor:pointer;">+3 부여</button>
+        <button class="btn-bonus" data-amount="0" style="padding:6px 12px; font-size:12px; background:#fef2f2; color:#dc2626; border:1px solid #fecaca; border-radius:6px; cursor:pointer;">초기화</button>
+        <button id="btn-view-sessions" style="padding:6px 12px; font-size:12px; background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; border-radius:6px; cursor:pointer; margin-left:auto;">문진 ${data.sessionCount}건 보기</button>
+      </div>
+
+      <div id="user-sessions"></div>
+    </div>`;
+
+  result.querySelectorAll('.btn-bonus').forEach((btn) => {
+    btn.addEventListener('click', () => grantQuota(Number((btn as HTMLElement).dataset.amount)));
+  });
+  document.getElementById('btn-view-sessions')!.addEventListener('click', viewUserSessions);
+}
+
+async function grantQuota(amount: number) {
+  if (!lastSearchedUid) return;
+  const res = await fetch('/api/admin/grant-quota', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...adminHeaders() },
+    body: JSON.stringify({ uid: lastSearchedUid, amount }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'HTTP ' + res.status }));
+    alert(err.error ?? '부여 실패');
+    return;
+  }
+  alert(amount === 0 ? '이번 주 추가 쿼터가 초기화되었습니다.' : `이번 주 추가 +${amount} 부여되었습니다.`);
+  await searchUser();
+}
+
+async function viewUserSessions() {
+  const target = document.getElementById('user-sessions')!;
+  if (target.innerHTML) { target.innerHTML = ''; return; }
+  if (!lastSearchedUid) return;
+
+  target.innerHTML = '<div style="color:var(--text-muted); font-size:13px;">불러오는 중...</div>';
+  const res = await fetch(`/api/admin/user-sessions?uid=${encodeURIComponent(lastSearchedUid)}`, { headers: adminHeaders() });
+  if (!res.ok) { target.innerHTML = '조회 실패'; return; }
+
+  const data = await res.json() as { sessions: Array<{
+    id: string; date: string; createdAt: number; redFlagLevel: string; painScale: number;
+    features: { chiefComplaint: string; onset: string };
+  }> };
+
+  if (data.sessions.length === 0) {
+    target.innerHTML = '<div style="color:var(--text-muted); font-size:13px; padding:8px;">문진 기록이 없습니다.</div>';
+    return;
+  }
+
+  target.innerHTML = `
+    <div style="margin-top:10px; max-height:320px; overflow-y:auto; border-top:1px solid var(--border); padding-top:10px;">
+      <table style="width:100%; font-size:12px;">
+        <thead><tr style="color:var(--text-muted);"><th style="text-align:left;padding:4px;">날짜</th><th style="text-align:left;padding:4px;">주증상</th><th style="text-align:left;padding:4px;">통증</th><th style="text-align:left;padding:4px;">응급도</th></tr></thead>
+        <tbody>${data.sessions.map((s) => `
+          <tr>
+            <td style="padding:4px;">${s.date}</td>
+            <td style="padding:4px;">${(s.features?.chiefComplaint ?? '-').slice(0, 30)}</td>
+            <td style="padding:4px;">${s.painScale}/10</td>
+            <td style="padding:4px;"><span class="badge badge-${s.redFlagLevel}">${s.redFlagLevel}</span></td>
+          </tr>`).join('')}</tbody>
+      </table>
+    </div>`;
 }
 
 function showError(e: unknown) {
