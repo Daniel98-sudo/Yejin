@@ -3,3 +3,4 @@ node_modules
 .env.local
 dist
 public/js
+.firebase-service-account.json
