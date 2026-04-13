@@ -149,8 +149,10 @@ body {
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
-.choice-btn:hover { border-color: var(--primary); background: #eff6ff; }
-.choice-btn.selected { border-color: var(--primary); background: #eff6ff; font-weight: 600; }
+@media (hover: hover) {
+  .choice-btn:hover:not(.selected) { border-color: var(--primary); background: #eff6ff; }
+}
+.choice-btn.selected { border-color: var(--primary); background: #eff6ff; font-weight: 600; color: var(--primary); }
 
 .slider-wrap { display: flex; flex-direction: column; gap: 8px; }
 .slider-wrap input[type=range] { width: 100%; accent-color: var(--primary); }
