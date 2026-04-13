@@ -1,112 +1,89 @@
 /**
  * POST /api/chat/turn
  * 적응형 문진 — 대화 히스토리를 받아 다음 AI 질문을 반환.
- * Gemini 가 OPQRST 체크리스트를 내부적으로 추적하며 1턴 1질문 진행.
- *
- * 요청:
- *   { sessionId, history: [{role:'user'|'assistant', content}], turnCount }
- * 응답:
- *   { assistantMessage, inputType, options?, min?, max?, placeholder?, complete, summary?, redFlag? }
  */
 import { google } from '@ai-sdk/google';
 import { generateText } from 'ai';
 import { verifyIdToken } from '../../src/lib/firebase-admin';
 
-const MAX_TURNS = 16; // 안전 상한
+const MAX_TURNS = 16;
 
 const SYSTEM_PROMPT = `당신은 한국 의료 AI 어시스턴트 "예진이"입니다. 환자가 병원 가기 전 의사 면담 자료를 만들기 위해 환자에게 한국어로 자연스럽게 질문합니다.
 
 ## 절대 규칙
-1. 한 턴에 **질문 한 개만** 합니다. 짧고 정중하게, 어르신도 알아들을 수 있게.
-2. 의학적 진단·처방·치료 권유 금지. 당신은 정보 수집자입니다.
-3. 환자의 답변을 **반드시** 다음 질문에 반영합니다(이전에 한 말 인용 OK).
-4. 출력은 **JSON 한 덩어리**만, 어떤 다른 텍스트(설명, 코드펜스)도 금지.
+1. 한 턴에 **질문 한 개만**. 짧고 정중하게, 어르신도 알아들을 수 있게.
+2. 의학적 진단·처방 금지. 당신은 정보 수집자입니다.
+3. 환자의 답변을 반드시 다음 질문에 반영합니다.
+4. **출력은 JSON 한 덩어리만.** 코드펜스(\`\`\`), 설명, 머리말, 꼬리말 절대 금지.
+5. JSON 문자열 안에 줄바꿈이 있으면 \\n 으로 이스케이프합니다.
 
 ## 수집 체크리스트 (모두 채우면 complete: true)
-- chiefComplaint: 어디가 어떻게 불편한지 (자유텍스트)
-- onset: 언제부터 (텍스트 or 선택)
-- duration: 지속 시간/빈도 (텍스트)
-- character: 양상 (찌릿/욱신/뻐근/타는듯 등)
-- location: 정확한 부위 (좌/우, 위치)
-- radiation: 다른 곳으로 뻗는지 (예/아니오 등)
-- aggravating: 악화 요인 (자세, 음식, 활동 등)
+- chiefComplaint: 어디가 어떻게 불편한지
+- onset: 언제부터
+- duration: 지속 시간/빈도
+- character: 양상 (찌릿/욱신/뻐근/타는듯)
+- location: 정확한 부위 (좌/우)
+- radiation: 다른 곳으로 뻗는지
+- aggravating: 악화 요인
 - relieving: 완화 요인
-- painScale: 통증 강도 (slider 0~10)
-- associatedSymptoms: 동반 증상 (multi-choice)
-- previousSimilar: 이전에 같은 증상 경험
-- chronicConditions: 만성질환 (당뇨, 고혈압, 심장질환 등 — multi-choice)
-- medications: 복용약/최근 변화 (텍스트)
-- redFlagsCheck: 위험 신호 (의식변화, 갑작스런 시야장애, 흉통+호흡곤란, 토혈/혈변, 발열+경부강직 등) — 증상에 따라 적절히 탐색
+- painScale: 통증 강도 0~10
+- associatedSymptoms: 동반 증상
+- previousSimilar: 이전 경험
+- chronicConditions: 만성질환 (당뇨·고혈압·심장·신장 등)
+- medications: 복용약/최근 변화
 
-## 적응 규칙
-- 환자가 가슴 통증을 말하면 → 부위, 방사(왼팔/턱), 호흡곤란, 식은땀, 평소 심혈관 질환 등을 깊이 캐기.
-- 환자가 두통을 말하면 → 갑작스런 발생인지, 인생 최악인지(천둥두통), 시야 이상, 구토, 발열·경부강직 탐색.
-- 환자가 복통을 말하면 → 부위(우하복부=충수돌기), 식사 관련, 구토, 발열, 변·소변 변화.
-- 답변이 모호하면 더 구체적으로 다시 묻기 (1회).
-- 위험 신호 감지 시 즉시 complete: true + redFlag 표시 (응급실 안내).
+## 증상별 적응
+- 가슴 통증 → 위치·방사(왼팔/턱)·호흡곤란·식은땀·심혈관 과거력
+- 두통 → 갑작스런지·인생 최악인지(천둥두통)·시야·구토·발열·경부강직
+- 복통 → 부위(우하복부=충수돌기 의심)·식사 관련·구토·변/소변
 
-## 입력 타입 가이드
-- "text": 자유 서술 필요할 때 (placeholder 권장)
-- "choice": 명확한 단답 (예/아니오 포함)
-- "multi-choice": 복수 선택 가능 (반드시 마지막 옵션에 "해당 없음" 포함)
-- "slider": 0~10 척도 (통증 강도 등)
+## 입력 타입
+- text: 자유 서술 (placeholder 권장)
+- choice: 단답 (options 필수)
+- multi-choice: 복수 선택 (options 필수, 마지막에 "해당 없음")
+- slider: 0~10 척도 (min, max 명시)
 
 ## 종료 조건
-- 체크리스트의 핵심 8개 이상 채워짐 → complete: true
-- 응급 신호 발견 → 즉시 complete: true
-- 턴 수가 너무 많아짐 → complete: true (시스템이 알려줌)
+- 핵심 8개 이상 채워짐 → complete: true
+- 응급 신호 발견 → 즉시 complete: true + redFlag 기입
+- 시스템이 MAX_TURNS 도달 통보 → 즉시 complete: true
 
-## 응답 JSON 스키마
-질문 중:
-{
-  "assistantMessage": "다음 질문 텍스트",
-  "inputType": "text|choice|multi-choice|slider",
-  "options": ["..."] (choice/multi-choice 일 때만),
-  "min": 0, "max": 10 (slider 일 때만),
-  "placeholder": "..." (text 일 때 선택),
-  "complete": false
+## 응답 스키마 — 질문 중
+{"assistantMessage":"...","inputType":"text|choice|multi-choice|slider","options":["..."],"min":0,"max":10,"placeholder":"...","complete":false}
+
+## 응답 스키마 — 종료
+{"assistantMessage":"감사합니다. 정리해드릴게요.","complete":true,"summary":{"chiefComplaint":"...","onset":"...","duration":"...","character":"...","location":"...","radiation":"...","aggravating":"...","relieving":"...","painScale":0,"associatedSymptoms":["..."],"previousSimilar":"...","chronicConditions":["..."],"medications":"...","questionsForDoctor":["...","...","..."],"narrativeSummary":"환자가 한 말을 의사가 빠르게 파악할 3-5문장 서술"},"redFlag":{"level":"EMERGENCY|URGENT|WARNING|ROUTINE","reason":"...","action":"..."}}
+
+JSON 이외 어떤 문자도 출력하지 마세요.`;
+
+interface Turn { role: 'user' | 'assistant'; content: string }
+
+function tryExtractJson(raw: string): string {
+  const text = raw.trim();
+  // 1) 코드펜스
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fenced) return fenced[1].trim();
+  // 2) 첫 { ~ 마지막 }
+  const first = text.indexOf('{');
+  const last = text.lastIndexOf('}');
+  if (first !== -1 && last > first) return text.slice(first, last + 1).trim();
+  return text;
 }
 
-종료 시:
-{
-  "assistantMessage": "감사합니다. 정리해드릴게요.",
-  "complete": true,
-  "summary": {
-    "chiefComplaint": "...",
-    "onset": "...",
-    "duration": "...",
-    "character": "...",
-    "location": "...",
-    "radiation": "...",
-    "aggravating": "...",
-    "relieving": "...",
-    "painScale": 0,
-    "associatedSymptoms": ["..."],
-    "previousSimilar": "...",
-    "chronicConditions": ["..."],
-    "medications": "...",
-    "questionsForDoctor": ["환자가 의사에게 꼭 물어볼 것 3개"],
-    "narrativeSummary": "환자가 한 모든 말을 의사가 빠르게 파악하도록 정돈한 3-5문장 서술 요약"
-  },
-  "redFlag": {
-    "level": "EMERGENCY|URGENT|WARNING|ROUTINE",
-    "reason": "한 줄 사유",
-    "action": "환자가 즉시 취해야 할 행동"
-  }
-}`;
-
-function stripFences(s: string): string {
-  const m = s.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  if (m) return m[1].trim();
-  const i = s.indexOf('{');
-  const j = s.lastIndexOf('}');
-  if (i !== -1 && j > i) return s.slice(i, j + 1).trim();
-  return s.trim();
+function sanitize(raw: string): string {
+  // trailing comma 제거 (},] 앞의 ,)
+  return raw.replace(/,(\s*[}\]])/g, '$1');
 }
 
-interface Turn {
-  role: 'user' | 'assistant';
-  content: string;
+async function askGemini(userPrompt: string, strict = false): Promise<string> {
+  const { text } = await generateText({
+    model: google('gemini-flash-latest'),
+    system: SYSTEM_PROMPT + (strict ? '\n\n※ 반드시 순수 JSON 한 덩어리만 반환하세요. 다른 텍스트 일체 금지.' : ''),
+    prompt: userPrompt,
+    maxOutputTokens: 2048,
+    temperature: strict ? 0.1 : 0.3,
+  });
+  return text;
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -124,26 +101,38 @@ export async function POST(req: Request): Promise<Response> {
   const turnCount = body.turnCount ?? 0;
   const overLimit = turnCount >= MAX_TURNS;
 
-  // 대화를 평문으로 합쳐 prompt 에 넣음
   const transcript = history.map((t) => `${t.role === 'user' ? '환자' : '예진이'}: ${t.content}`).join('\n');
 
   const userPrompt = history.length === 0
-    ? '대화를 시작합니다. 첫 질문은 환자의 주증상을 자유롭게 묻는 것이어야 합니다. JSON으로만 응답하세요.'
-    : `현재까지 대화:\n${transcript}\n\n${overLimit ? '※ 턴 수가 한계에 도달했습니다. 지금까지 정보로 complete: true 를 반환하세요.' : '환자의 마지막 답변을 반영해 다음 질문 1개를 JSON으로만 응답하세요.'}`;
+    ? '대화를 시작합니다. 첫 질문은 환자의 주증상을 자유롭게 묻는 것이어야 합니다. JSON만 반환하세요.'
+    : `현재까지 대화:\n${transcript}\n\n${overLimit ? '※ 턴 수 한계 도달. complete: true 로 종료하세요.' : '환자의 마지막 답변을 반영해 다음 질문 하나를 JSON으로 반환하세요.'}`;
 
-  const { text } = await generateText({
-    model: google('gemini-flash-latest'),
-    system: SYSTEM_PROMPT,
-    prompt: userPrompt,
-    maxOutputTokens: 1024,
-    temperature: 0.4,
-  });
+  let rawText = '';
+  let parsed: Record<string, unknown> | null = null;
+  let attempts = 0;
+  let lastError = '';
 
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(stripFences(text));
-  } catch {
-    return Response.json({ error: 'AI 응답 파싱 실패', raw: text }, { status: 502 });
+  while (attempts < 2 && !parsed) {
+    try {
+      rawText = await askGemini(userPrompt, attempts > 0);
+      const cleaned = sanitize(tryExtractJson(rawText));
+      parsed = JSON.parse(cleaned);
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+      console.error('[chat/turn] parse attempt', attempts + 1, 'failed:', lastError, '\nRaw:', rawText.slice(0, 500));
+    }
+    attempts++;
+  }
+
+  if (!parsed) {
+    // graceful fallback — 클라이언트가 복구할 수 있도록 재시도 가능한 질문 반환
+    return Response.json({
+      assistantMessage: '죄송해요, 잠깐 다시 여쭤볼게요. 조금 전 말씀해주신 증상을 한 번 더 간단히 설명해주시겠어요?',
+      inputType: 'text',
+      placeholder: '증상을 편하게 적어주세요',
+      complete: false,
+      _recovered: true,
+    });
   }
 
   return Response.json(parsed);

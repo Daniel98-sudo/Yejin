@@ -165,18 +165,35 @@ function renderInput(t: AssistantTurn, onAnswer: (display: string, raw: string |
 
 // ── Core Loop ───────────────────────────────────────────
 
-async function callTurn(): Promise<AssistantTurn | null> {
-  const res = await fetch('/api/chat/turn', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ sessionId, history, turnCount: history.filter((t) => t.role === 'user').length }),
-  });
-  if (res.status === 401) { window.location.href = '/login.html'; return null; }
-  if (!res.ok) {
-    inputAreaEl.innerHTML = '<div style="color:#dc2626; padding:16px;">AI 응답 실패. 새로고침 후 다시 시도해주세요.</div>';
+async function callTurn(retryCount = 0): Promise<AssistantTurn | null> {
+  try {
+    const res = await fetch('/api/chat/turn', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ sessionId, history, turnCount: history.filter((t) => t.role === 'user').length }),
+    });
+    if (res.status === 401) { window.location.href = '/login.html'; return null; }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (e) {
+    // 최대 1회 자동 재시도
+    if (retryCount < 1) {
+      await new Promise((r) => setTimeout(r, 800));
+      return callTurn(retryCount + 1);
+    }
+    showRetryUI(e instanceof Error ? e.message : '네트워크 오류');
     return null;
   }
-  return res.json();
+}
+
+function showRetryUI(msg: string) {
+  inputAreaEl.innerHTML = `
+    <div style="padding:16px; text-align:center;">
+      <div style="color:#dc2626; margin-bottom:12px;">AI 응답을 받지 못했어요.</div>
+      <div style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">${msg}</div>
+      <button id="retry-btn" class="btn btn-primary" style="width:auto; padding:10px 24px;">다시 시도</button>
+    </div>`;
+  document.getElementById('retry-btn')!.addEventListener('click', () => { nextTurn(); });
 }
 
 async function nextTurn() {
