@@ -1,5 +1,6 @@
-import type { Answer, ReportRequest, ReportResponse, ReportSection } from '../../src/types/index';
+import { verifyIdToken } from '../../src/lib/firebase-admin';
 import { evaluateRedFlag } from '../../src/lib/redflag';
+import type { Answer, ReportRequest, ReportResponse, ReportSection } from '../../src/types/index';
 
 function buildPrompt(answers: Answer[]): string {
   const lines = answers.map((a) => {
@@ -10,6 +11,11 @@ function buildPrompt(answers: Answer[]): string {
 }
 
 export async function POST(req: Request): Promise<Response> {
+  const uid = await verifyIdToken(req);
+  if (!uid) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   let body: ReportRequest;
   try {
     body = await req.json();
@@ -22,10 +28,14 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: 'answers is required' }, { status: 400 });
   }
 
-  // AI 파싱은 /api/proxy/parse 경유
+  // Authorization 헤더를 parse 프록시에 그대로 전달
+  const authHeader = req.headers.get('Authorization') ?? '';
   const parseRes = await fetch(`${getBaseUrl(req)}/api/proxy/parse`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: authHeader,
+    },
     body: JSON.stringify({ prompt: buildPrompt(answers) }),
   });
 
@@ -33,13 +43,13 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: 'AI parsing failed' }, { status: 502 });
   }
 
-  const { result } = await parseRes.json() as { result: Omit<ReportSection, 'redFlag' | 'generatedAt' | 'algorithmVersion'> };
-
-  const redFlag = evaluateRedFlag(answers);
+  const { result } = await parseRes.json() as {
+    result: Omit<ReportSection, 'redFlag' | 'generatedAt' | 'algorithmVersion'>;
+  };
 
   const report: ReportSection = {
     ...result,
-    redFlag,
+    redFlag: evaluateRedFlag(answers),
     generatedAt: new Date().toISOString(),
     algorithmVersion: '2026.04',
   };

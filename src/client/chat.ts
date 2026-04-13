@@ -5,12 +5,14 @@ import type {
   RedFlagResult,
   StartSessionResponse,
 } from '../types/index';
+import { requireAuth, authHeaders } from './auth-guard';
 
 const TOTAL_STEPS = 7;
 
 let sessionId = '';
 let answers: Answer[] = [];
 let currentStep = 0;
+let token = '';
 
 const messagesEl = document.getElementById('messages')!;
 const inputAreaEl = document.getElementById('input-area')!;
@@ -35,16 +37,9 @@ function setProgress(step: number) {
 }
 
 function showRedFlagOverlay(rf: RedFlagResult, onContinue: () => void) {
-  if (rf.level === 'ROUTINE') {
-    onContinue();
-    return;
-  }
+  if (rf.level === 'ROUTINE') { onContinue(); return; }
 
-  const icons: Record<string, string> = {
-    EMERGENCY: '🚨',
-    URGENT: '⚠️',
-    WARNING: '📋',
-  };
+  const icons: Record<string, string> = { EMERGENCY: '🚨', URGENT: '⚠️', WARNING: '📋' };
   const titles: Record<string, string> = {
     EMERGENCY: '응급 상황 감지',
     URGENT: '빠른 진료 필요',
@@ -58,11 +53,9 @@ function showRedFlagOverlay(rf: RedFlagResult, onContinue: () => void) {
   document.getElementById('flag-reason')!.textContent = rf.reason;
   document.getElementById('flag-action')!.textContent = rf.action;
 
-  const btn119 = document.getElementById('flag-119')!;
   if (rf.level === 'EMERGENCY') {
-    btn119.classList.remove('hidden');
+    document.getElementById('flag-119')!.classList.remove('hidden');
   }
-
   document.getElementById('flag-continue')!.onclick = () => {
     overlay.classList.add('hidden');
     onContinue();
@@ -78,17 +71,10 @@ function renderTextInput(question: Question, onSubmit: (v: string) => void) {
       <button class="send-btn" id="send-btn">→</button>
     </div>`;
   const txt = document.getElementById('txt') as HTMLTextAreaElement;
-  const btn = document.getElementById('send-btn')!;
   txt.focus();
-  const submit = () => {
-    const val = txt.value.trim();
-    if (!val) return;
-    onSubmit(val);
-  };
-  btn.onclick = submit;
-  txt.onkeydown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
-  };
+  const submit = () => { const v = txt.value.trim(); if (v) onSubmit(v); };
+  document.getElementById('send-btn')!.onclick = submit;
+  txt.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } };
 }
 
 function renderChoices(question: Question, onSubmit: (v: string) => void) {
@@ -114,8 +100,7 @@ function renderSlider(question: Question, onSubmit: (v: number) => void) {
       <button class="btn btn-primary mt-16" id="slider-submit">이 점수로 제출</button>
     </div>`;
   const slider = document.getElementById('slider') as HTMLInputElement;
-  const valEl = document.getElementById('slider-val')!;
-  slider.oninput = () => { valEl.textContent = slider.value; };
+  slider.oninput = () => { document.getElementById('slider-val')!.textContent = slider.value; };
   document.getElementById('slider-submit')!.onclick = () => onSubmit(Number(slider.value));
 }
 
@@ -132,21 +117,14 @@ function renderMultiChoice(question: Question, onSubmit: (v: string[]) => void) 
         selected.clear();
         div.querySelectorAll('.choice-btn').forEach((b) => b.classList.remove('selected'));
         selected.add(opt);
-        btn.classList.add('selected');
       } else {
         selected.delete('해당 없음');
-        if (selected.has(opt)) {
-          selected.delete(opt);
-          btn.classList.remove('selected');
-        } else {
-          selected.add(opt);
-          btn.classList.add('selected');
-        }
+        selected.has(opt) ? selected.delete(opt) : selected.add(opt);
       }
+      btn.classList.toggle('selected', selected.has(opt));
     };
     div.appendChild(btn);
   });
-
   const confirmBtn = document.createElement('button');
   confirmBtn.className = 'btn btn-primary mt-16';
   confirmBtn.textContent = '선택 완료';
@@ -154,7 +132,6 @@ function renderMultiChoice(question: Question, onSubmit: (v: string[]) => void) 
     if (selected.size === 0) selected.add('해당 없음');
     onSubmit([...selected]);
   };
-
   inputAreaEl.innerHTML = '';
   inputAreaEl.appendChild(div);
   inputAreaEl.appendChild(confirmBtn);
@@ -171,20 +148,17 @@ function renderQuestion(question: Question) {
     addBubble(displayValue, 'user');
     inputAreaEl.innerHTML = '<div class="loading">다음 질문을 불러오는 중...</div>';
 
-    const answer: Answer = {
-      questionId: question.id,
-      questionText: question.text,
-      value,
-    };
-    answers = [...answers, answer];
+    answers = [...answers, { questionId: question.id, questionText: question.text, value }];
     currentStep += 1;
     setProgress(currentStep);
 
     const res = await fetch('/api/consultation/answer', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ sessionId, answers, currentStep }),
     });
+
+    if (res.status === 401) { window.location.href = '/login.html'; return; }
 
     const data: AnswerResponse = await res.json();
 
@@ -197,18 +171,10 @@ function renderQuestion(question: Question) {
   };
 
   switch (question.type) {
-    case 'text':
-      renderTextInput(question, (v) => handleAnswer(v));
-      break;
-    case 'choice':
-      renderChoices(question, (v) => handleAnswer(v));
-      break;
-    case 'slider':
-      renderSlider(question, (v) => handleAnswer(v));
-      break;
-    case 'multi-choice':
-      renderMultiChoice(question, (v) => handleAnswer(v));
-      break;
+    case 'text': renderTextInput(question, (v) => handleAnswer(v)); break;
+    case 'choice': renderChoices(question, (v) => handleAnswer(v)); break;
+    case 'slider': renderSlider(question, (v) => handleAnswer(v)); break;
+    case 'multi-choice': renderMultiChoice(question, (v) => handleAnswer(v)); break;
   }
 }
 
@@ -220,14 +186,17 @@ function goToReport() {
 // ── Init ──────────────────────────────────────────────────
 
 async function init() {
+  token = await requireAuth();
   setProgress(0);
-  addBubble('안녕하세요! 저는 예진이예요. 잠깐만요...', 'ai');
 
-  const res = await fetch('/api/consultation/start', { method: 'POST' });
+  const res = await fetch('/api/consultation/start', {
+    method: 'POST',
+    headers: { ...authHeaders() },
+  });
+  if (res.status === 401) { window.location.href = '/login.html'; return; }
+
   const data: StartSessionResponse = await res.json();
   sessionId = data.sessionId;
-
-  messagesEl.innerHTML = '';
   renderQuestion(data.firstQuestion);
 }
 

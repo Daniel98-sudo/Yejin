@@ -1,4 +1,4 @@
-import { anthropic } from '@ai-sdk/anthropic';
+import { google } from '@ai-sdk/google';
 import { generateText } from 'ai';
 
 const SYSTEM_PROMPT = `당신은 예진이입니다. 환자의 문진 답변을 분석하여 의사에게 보여줄 예진 보고서를 JSON으로 생성합니다.
@@ -26,7 +26,7 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const { text } = await generateText({
-    model: anthropic('claude-sonnet-4-6'),
+    model: google('gemini-flash-latest'),
     system: SYSTEM_PROMPT,
     prompt: body.prompt,
     maxOutputTokens: 2048,
