@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>예진이 — 약관</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    body { background:#fafaf9; }
+    .legal-page { max-width: 760px; margin: 0 auto; padding: 32px 24px; background: white; min-height: 100vh; }
+    .legal-nav { display:flex; gap:8px; margin-bottom:20px; border-bottom:1px solid var(--border); padding-bottom:12px; }
+    .legal-nav a { padding:8px 14px; font-size:14px; color:var(--text-muted); text-decoration:none; border-radius:8px; }
+    .legal-nav a.active { color:#2563eb; background:#eff6ff; font-weight:600; }
+    .legal-back { display:inline-block; margin-bottom:12px; font-size:13px; color:var(--text-muted); text-decoration:none; }
+    article h1 { font-size:24px; margin-top:4px; margin-bottom:8px; }
+    article h2 { font-size:18px; margin-top:28px; margin-bottom:10px; color:#0f172a; border-bottom:1px solid var(--border); padding-bottom:6px; }
+    article h3 { font-size:15px; margin-top:18px; margin-bottom:8px; }
+    article p, article li { line-height:1.7; color:#334155; font-size:15px; }
+    article ul, article ol { padding-left:22px; margin:8px 0; }
+    article li { margin-bottom:4px; }
+    article strong { color:#0f172a; }
+    article hr { border:none; border-top:1px solid var(--border); margin:28px 0; }
+    article blockquote { background:#fef2f2; border-left:4px solid #dc2626; padding:12px 16px; margin:12px 0; border-radius:4px; color:#7f1d1d; font-size:14px; }
+    article table { width:100%; border-collapse:collapse; margin:12px 0; font-size:14px; }
+    article table th, article table td { border:1px solid var(--border); padding:8px 10px; text-align:left; }
+    article table th { background:#f8fafc; font-weight:600; }
+    article code { background:#f1f5f9; padding:2px 6px; border-radius:4px; font-size:13px; }
+  </style>
+</head>
+<body>
+  <div class="legal-page">
+    <a class="legal-back" href="/">← 홈으로</a>
+
+    <nav class="legal-nav">
+      <a href="/legal.html?doc=terms" data-doc="terms">이용약관</a>
+      <a href="/legal.html?doc=privacy" data-doc="privacy">개인정보처리방침</a>
+    </nav>
+
+    <article id="content">
+      <p style="color:var(--text-muted);">문서를 불러오는 중...</p>
+    </article>
+
+    <footer style="margin-top:40px; padding-top:20px; border-top:1px solid var(--border); font-size:12px; color:var(--text-muted); line-height:1.7;">
+      <strong>주식회사 플로우메이트 (FlowMate Inc.)</strong><br/>
+      대표자: 권도형 · 사업자등록번호: 772-88-04021<br/>
+      부산광역시 사하구 감천로 49, 7층 353호 (감천동, 희원감천)<br/>
+      © 2026 FlowMate Inc. All rights reserved.
+    </footer>
+  </div>
+
+  <script src="/js/legal.js"></script>
+</body>
+</html>
