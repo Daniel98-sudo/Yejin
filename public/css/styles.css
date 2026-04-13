@@ -70,6 +70,8 @@ body {
 }
 .btn-primary { background: var(--primary); color: #fff; }
 .btn-primary:hover { background: var(--primary-dark); }
+.btn:disabled, .btn[disabled] { background: #e2e8f0 !important; color: #94a3b8 !important; cursor: not-allowed; opacity: 1; }
+.btn:disabled:hover, .btn[disabled]:hover { background: #e2e8f0 !important; }
 .btn-ghost {
   background: transparent;
   border: 1px solid var(--border);

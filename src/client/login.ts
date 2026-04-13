@@ -129,7 +129,32 @@ async function handleEmailSubmit() {
     }
     await proceedAfterLogin(user);
   } catch (e) {
-    showMsg(errMessage(e));
+    const code = (e as { code?: string }).code ?? '';
+
+    // 가입 시도인데 이미 존재하는 이메일 → 같은 비밀번호로 로그인 시도
+    // 이전 가입 시도가 인증 완료 안 된 경우 자동 복구 + 인증 메일 재발송
+    if (mode === 'signup' && code === 'auth/email-already-in-use') {
+      try {
+        const user = await signInWithEmail(email, password);
+        if (!user.emailVerified) {
+          await resendVerification(user);
+          showVerifyPrompt(user);
+          showMsg(`이전에 가입을 시작하셨던 이메일입니다. ${email} 로 인증 메일을 다시 보냈습니다. 메일을 확인해주세요.`, 'info');
+        } else {
+          await proceedAfterLogin(user);
+        }
+      } catch (e2) {
+        const code2 = (e2 as { code?: string }).code ?? '';
+        if (code2 === 'auth/wrong-password' || code2 === 'auth/invalid-credential') {
+          showMsg('이미 다른 비밀번호로 가입된 이메일입니다. <strong>로그인</strong> 탭에서 시도하시거나, 비밀번호를 잊으셨다면 "비밀번호를 잊으셨나요?"를 눌러주세요.', 'err', true);
+        } else {
+          showMsg(errMessage(e2));
+        }
+      }
+    } else {
+      showMsg(errMessage(e));
+    }
+
     submitBtn.disabled = false;
     submitBtn.textContent = originalText;
   }
