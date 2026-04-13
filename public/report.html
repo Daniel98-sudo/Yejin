@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>예진이 — 예진 보고서</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <div class="page">
+    <div class="header" style="padding-bottom:8px;">
+      <div style="display:flex; align-items:center; gap:8px; justify-content:center;">
+        <span style="font-size:20px;">🩺</span>
+        <span style="font-weight:700; font-size:18px;">예진 보고서</span>
+      </div>
+      <p style="margin-top:4px;">의사 선생님께 이 화면을 보여주세요</p>
+    </div>
+
+    <div id="loading" class="loading">보고서를 생성하고 있어요...</div>
+    <div id="report-content" class="report-wrap hidden"></div>
+
+    <div class="report-footer">
+      이 문서는 AI가 생성한 면담 준비 메모입니다.<br />
+      의학적 진단이 아니며 의사의 판단을 대체하지 않습니다.<br />
+      알고리즘 버전: 2026.04
+    </div>
+  </div>
+
+  <script src="/js/report.js"></script>
+</body>
+</html>

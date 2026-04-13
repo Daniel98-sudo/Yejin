@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>예진이 — 병원 가기 전 AI 문진</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <div class="logo">🩺</div>
+      <h1>예진이</h1>
+      <p>병원 가기 전, AI와 미리 문진하세요</p>
+    </div>
+
+    <div class="disclaimer">
+      <strong>⚠️ 이용 전 꼭 읽어주세요</strong>
+      예진이는 의료기기가 아니며, 의학적 진단을 제공하지 않습니다.
+      본 서비스가 제공하는 정보는 의사와의 면담을 준비하기 위한 참고 자료이며,
+      의사의 진단·처방을 대체하지 않습니다.<br /><br />
+      <strong>응급 상황에서는 즉시 119에 연락하거나 응급실을 방문하세요.</strong>
+    </div>
+
+    <div style="flex:1"></div>
+
+    <div style="padding-bottom: 32px; display: flex; flex-direction: column; gap: 12px;">
+      <label style="display:flex; align-items:flex-start; gap:10px; font-size:14px; cursor:pointer;">
+        <input type="checkbox" id="agree-check" style="margin-top:2px; accent-color: #2563eb;" />
+        위 내용을 읽었으며 동의합니다.
+      </label>
+      <a id="start-btn" href="/chat.html"
+        class="btn btn-primary"
+        style="pointer-events:none; opacity:0.4;"
+        onclick="return document.getElementById('agree-check').checked">
+        예진이 시작하기 →
+      </a>
+    </div>
+  </div>
+
+  <script>
+    const check = document.getElementById('agree-check');
+    const btn = document.getElementById('start-btn');
+    check.addEventListener('change', () => {
+      btn.style.opacity = check.checked ? '1' : '0.4';
+      btn.style.pointerEvents = check.checked ? 'auto' : 'none';
+    });
+  </script>
+</body>
+</html>

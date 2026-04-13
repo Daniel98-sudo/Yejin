@@ -1,0 +1,21 @@
+{
+  "name": "yejin",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "esbuild src/client/index.ts src/client/chat.ts src/client/report.ts --bundle --outdir=public/js --platform=browser --target=es2020 --minify",
+    "dev": "vercel dev",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.69",
+    "@anthropic-ai/sdk": "^0.39.0",
+    "ai": "^6.0.158"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@vercel/node": "^3.0.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.4.0"
+  }
+}
