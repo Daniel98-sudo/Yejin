@@ -90,6 +90,9 @@ async function init() {
   currentSessionId = sessionStorage.getItem('yejin_session_id') ?? '';
   if (!currentSessionId) { window.location.href = '/consult.html'; return; }
 
+  const tsv = sessionStorage.getItem('yejin_questionnaire_tsv');
+  const flowKey = sessionStorage.getItem('yejin_questionnaire_flow');
+  const qAnswersRaw = sessionStorage.getItem('yejin_questionnaire_answers');
   const summaryRaw = sessionStorage.getItem('yejin_chat_summary');
   const historyRaw = sessionStorage.getItem('yejin_chat_history');
   const redFlagRaw = sessionStorage.getItem('yejin_chat_redflag');
@@ -97,7 +100,15 @@ async function init() {
 
   let body: Record<string, unknown> = { sessionId: currentSessionId };
 
-  if (summaryRaw && historyRaw) {
+  if (tsv && flowKey && qAnswersRaw) {
+    body = {
+      sessionId: currentSessionId,
+      mode: 'questionnaire',
+      tsv,
+      flowKey,
+      questionnaireAnswers: JSON.parse(qAnswersRaw),
+    };
+  } else if (summaryRaw && historyRaw) {
     const summary: ChatSummary = JSON.parse(summaryRaw);
     const history = JSON.parse(historyRaw);
     const redFlag: RedFlagResult | null = redFlagRaw ? JSON.parse(redFlagRaw) : null;
