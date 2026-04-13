@@ -18,7 +18,11 @@ async function init() {
 
   const res = await fetch('/api/consultation/quota', { headers: authHeaders() });
   if (!res.ok) {
-    document.getElementById('quota-num')!.textContent = '?';
+    const err = await res.text().catch(() => '');
+    console.error('[consult] quota fetch failed', res.status, err);
+    document.getElementById('quota-num')!.textContent = '3번';
+    document.getElementById('quota-reset')!.textContent = '쿼터 정보를 불러오지 못했습니다. 문진은 진행 가능합니다.';
+    document.getElementById('start-btn')!.addEventListener('click', () => { window.location.href = '/chat.html'; });
     return;
   }
   const data = await res.json() as { remaining: number; limit: number; used: number; resetAt: number };

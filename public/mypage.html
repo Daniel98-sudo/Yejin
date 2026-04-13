@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>예진이 — 내 계정</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    .section { background:white; border:1px solid var(--border); border-radius:12px; padding:18px 20px; margin-bottom:16px; }
+    .section h3 { margin:0 0 12px 0; font-size:15px; display:flex; align-items:center; gap:8px; }
+    .info-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:14px; }
+    .info-row:last-child { border-bottom:none; }
+    .info-row .label { color:var(--text-muted); }
+    .info-row .value { color:#0f172a; font-weight:500; }
+    .field-row { display:flex; flex-direction:column; gap:6px; margin-bottom:12px; }
+    .field-row label { font-size:13px; color:var(--text-muted); }
+    .field-row input { padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; }
+    .msg { font-size:13px; padding:10px 12px; border-radius:6px; margin-bottom:10px; }
+    .msg-err { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
+    .msg-ok { background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; }
+    .danger { border-color:#fecaca; background:#fef2f2; }
+    .danger h3 { color:#dc2626; }
+    .btn-danger { background:#dc2626; color:white; }
+    .btn-danger:hover { background:#b91c1c; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 0;">
+      <h1 style="margin:0; font-size:20px;">내 계정</h1>
+      <a id="back-link" href="/consult.html" style="font-size:13px; color:var(--text-muted); text-decoration:none;">← 돌아가기</a>
+    </div>
+
+    <div id="loading" class="loading">불러오는 중...</div>
+
+    <div id="mypage-content" class="hidden">
+      <!-- 계정 정보 -->
+      <div class="section">
+        <h3>📋 계정 정보</h3>
+        <div class="info-row"><span class="label">이메일</span><span class="value" id="info-email">-</span></div>
+        <div class="info-row"><span class="label">가입일</span><span class="value" id="info-created">-</span></div>
+        <div class="info-row"><span class="label">이메일 인증</span><span class="value" id="info-verified">-</span></div>
+        <div class="info-row"><span class="label">계정 유형</span><span class="value" id="info-role">-</span></div>
+      </div>
+
+      <!-- 이번 주 문진 쿼터 (환자만) -->
+      <div id="quota-section" class="section hidden">
+        <h3>📊 이번 주 문진</h3>
+        <div class="info-row"><span class="label">남은 횟수</span><span class="value" id="info-quota">-</span></div>
+        <div class="info-row"><span class="label">다음 리셋</span><span class="value" id="info-reset">-</span></div>
+      </div>
+
+      <!-- 비밀번호 변경 -->
+      <div class="section" id="password-section">
+        <h3>🔒 비밀번호 변경</h3>
+        <div id="pw-msg"></div>
+        <div class="field-row">
+          <label for="pw-current">현재 비밀번호</label>
+          <input type="password" id="pw-current" autocomplete="current-password" />
+        </div>
+        <div class="field-row">
+          <label for="pw-new">새 비밀번호 (8자 이상, 영문+숫자)</label>
+          <input type="password" id="pw-new" autocomplete="new-password" />
+        </div>
+        <div class="field-row">
+          <label for="pw-new2">새 비밀번호 확인</label>
+          <input type="password" id="pw-new2" autocomplete="new-password" />
+        </div>
+        <button id="pw-submit" class="btn btn-primary">비밀번호 변경</button>
+      </div>
+
+      <!-- 로그아웃 -->
+      <div class="section">
+        <h3>👋 로그아웃</h3>
+        <p style="font-size:13px; color:var(--text-muted); margin:0 0 10px 0;">현재 기기에서 로그아웃합니다.</p>
+        <button id="logout-btn" class="btn btn-ghost">로그아웃</button>
+      </div>
+
+      <!-- 회원탈퇴 -->
+      <div class="section danger">
+        <h3>⚠️ 회원탈퇴</h3>
+        <p style="font-size:13px; color:#7f1d1d; margin:0 0 12px 0; line-height:1.6;">
+          탈퇴 시 <strong>모든 문진 기록 · 공유 토큰 · 계정 정보</strong>가 즉시 삭제되며 복구할 수 없습니다.<br/>
+          병원 계정이신 경우 사업자등록증 사본도 함께 삭제됩니다.
+        </p>
+        <div id="del-msg"></div>
+        <button id="delete-btn" class="btn btn-danger">회원탈퇴</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/mypage.js"></script>
+  <script src="/js/footer.js"></script>
+</body>
+</html>
