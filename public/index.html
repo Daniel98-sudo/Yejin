@@ -22,12 +22,13 @@
       <strong>응급 상황에서는 즉시 119에 연락하거나 응급실을 방문하세요.</strong>
     </div>
 
-    <!-- 데이터 수집 동의 (개보법 §23 — 건강정보 명시적 동의) -->
+    <!-- 과학적 연구 목적 데이터 활용 (개보법 §28조의2) -->
     <div class="disclaimer" style="background:#eff6ff; border-color:#bfdbfe; color:#1e3a5f;">
-      <strong>📊 데이터 활용 안내 (선택)</strong>
-      증상 패턴 데이터를 익명(고유ID)으로 수집하여 서비스 개선 및 AI 학습에 활용할 수 있습니다.
-      실명·연락처 등 개인정보는 수집되지 않습니다.
-      동의하지 않아도 서비스 이용에 제한이 없습니다.
+      <strong>📊 과학적 연구 목적 데이터 활용 안내 (필수)</strong>
+      본 서비스 이용 시 발생하는 문진 응답 데이터는 <strong>가명처리</strong> 후
+      「개인정보 보호법」 §28조의2에 따른 <strong>과학적 연구 목적</strong>으로 활용됩니다.
+      실명·연락처·이메일 등 개인 식별정보는 일절 수집·저장되지 않으며,
+      가명처리된 데이터는 타 정보와 결합 금지 및 내부 관리 기록 의무를 준수하여 관리됩니다.
     </div>
 
     <div style="flex:1"></div>
@@ -39,7 +40,7 @@
       </label>
       <label style="display:flex; align-items:flex-start; gap:10px; font-size:14px; cursor:pointer;">
         <input type="checkbox" id="data-check" style="margin-top:2px; accent-color: #2563eb;" />
-        익명 건강데이터 수집 및 AI 학습 활용에 동의합니다. <span style="color:#64748b;">(선택)</span>
+        가명처리된 문진 데이터의 과학적 연구 목적 활용에 동의합니다. <span style="color:#dc2626;">(필수)</span>
       </label>
       <a id="start-btn" href="/login.html"
         class="btn btn-primary"
@@ -62,17 +63,18 @@
     const btn = document.getElementById('start-btn');
 
     agreeCheck.addEventListener('change', updateBtn);
+    dataCheck.addEventListener('change', updateBtn);
 
     function updateBtn() {
-      const ok = agreeCheck.checked;
+      const ok = agreeCheck.checked && dataCheck.checked;
       btn.style.opacity = ok ? '1' : '0.4';
       btn.style.pointerEvents = ok ? 'auto' : 'none';
     }
 
     btn.addEventListener('click', (e) => {
-      if (!agreeCheck.checked) { e.preventDefault(); return; }
-      // 데이터 수집 동의 여부를 sessionStorage에 저장 → 로그인 후 Firestore에 기록
-      sessionStorage.setItem('yejin_data_consent', dataCheck.checked ? 'true' : 'false');
+      if (!agreeCheck.checked || !dataCheck.checked) { e.preventDefault(); return; }
+      // 필수 동의 — 로그인 후 Firestore에 기록
+      sessionStorage.setItem('yejin_data_consent', 'true');
     });
   </script>
 </body>

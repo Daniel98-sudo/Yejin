@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>예진이 — 병원 회원가입</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    .field { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+    .field label { font-size:13px; color:var(--text-muted); }
+    .field input, .field input[type=file] { padding:12px; border:1px solid var(--border); border-radius:8px; font-size:15px; }
+    .field input:focus { outline:none; border-color:#2563eb; }
+    .msg { font-size:13px; padding:10px; border-radius:6px; margin-bottom:12px; }
+    .msg-err { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
+    .msg-ok { background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; }
+    .msg-info { background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; }
+    .hint { font-size:12px; color:var(--text-muted); }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <div class="logo">🏥</div>
+      <h1>병원 회원가입</h1>
+      <p>승인 후 병원 계정으로 이용 가능합니다</p>
+    </div>
+
+    <div style="padding:24px 0;">
+      <div id="msg-box"></div>
+
+      <div class="field">
+        <label for="email">관리자 이메일</label>
+        <input type="email" id="email" autocomplete="email" placeholder="hospital@example.com" />
+      </div>
+      <div class="field">
+        <label for="password">비밀번호 <span class="hint">(8자 이상, 영문+숫자 포함)</span></label>
+        <input type="password" id="password" autocomplete="new-password" />
+      </div>
+      <div class="field">
+        <label for="password2">비밀번호 확인</label>
+        <input type="password" id="password2" autocomplete="new-password" />
+      </div>
+      <div class="field">
+        <label for="hospital-name">병원명</label>
+        <input type="text" id="hospital-name" placeholder="예) 서울의료원" />
+      </div>
+      <div class="field">
+        <label for="cert-file">사업자등록증 <span class="hint">(PDF / JPG / PNG, 최대 600KB)</span></label>
+        <input type="file" id="cert-file" accept=".pdf,image/png,image/jpeg" />
+      </div>
+
+      <button id="submit-btn" class="btn btn-primary" style="width:100%; margin-top:8px;">가입 신청하기</button>
+
+      <p class="hint" style="text-align:center; margin-top:14px;">
+        신청 후 관리자 승인이 필요합니다. 승인 완료 시 등록하신 이메일로 안내됩니다.
+      </p>
+    </div>
+
+    <div style="flex:1"></div>
+
+    <div style="text-align:center; padding-bottom: 16px;">
+      <a href="/admin/login.html" style="font-size:12px; color:var(--text-muted);">← 관리자·병원 로그인으로 돌아가기</a>
+    </div>
+  </div>
+
+  <script src="/js/hospital/signup.js"></script>
+</body>
+</html>

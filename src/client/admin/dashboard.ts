@@ -87,7 +87,7 @@ async function init() {
     const tokenResult = await user.getIdTokenResult(true);
     const role = tokenResult.claims['role'];
 
-    if (role !== 'superadmin' && role !== 'hospital') {
+    if (role !== 'superadmin') {
       window.location.href = '/admin/login.html';
       return;
     }
@@ -105,13 +105,112 @@ async function init() {
     });
 
     try {
-      await Promise.all([loadStats(), loadSessions(0)]);
+      await Promise.all([loadStats(), loadSessions(0), loadHospitals()]);
       document.getElementById('loading')!.classList.add('hidden');
       document.getElementById('dashboard')!.classList.remove('hidden');
     } catch (e) {
       showError(e);
     }
   });
+}
+
+interface HospitalSummary {
+  uid: string;
+  email: string;
+  name: string;
+  createdAt: { _seconds?: number; seconds?: number } | number;
+}
+
+async function loadHospitals() {
+  const res = await fetch('/api/admin/hospitals', { headers: adminHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(`/api/admin/hospitals: ${err.error ?? res.statusText}`);
+  }
+
+  const data = await res.json() as { hospitals: HospitalSummary[] };
+  const list = data.hospitals ?? [];
+  const badge = document.getElementById('hospital-badge')!;
+  const container = document.getElementById('hospital-list')!;
+  badge.textContent = list.length ? `(${list.length}건)` : '';
+
+  if (list.length === 0) {
+    container.innerHTML = '<div style="color:var(--text-muted); font-size:13px; padding:12px 0;">대기 중인 병원 신청이 없습니다.</div>';
+    return;
+  }
+
+  container.innerHTML = list.map((h) => `
+    <div class="hospital-row" data-uid="${h.uid}" style="border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:start; gap:12px;">
+        <div>
+          <div style="font-weight:600;">${h.name}</div>
+          <div style="font-size:12px; color:var(--text-muted);">${h.email}</div>
+          <div style="font-size:11px; color:var(--text-muted); font-family:monospace;">${h.uid.slice(0, 12)}...</div>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button class="btn-view" data-uid="${h.uid}" style="padding:6px 12px; font-size:12px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; cursor:pointer;">서류 보기</button>
+          <button class="btn-approve" data-uid="${h.uid}" style="padding:6px 12px; font-size:12px; background:#16a34a; color:white; border:none; border-radius:6px; cursor:pointer;">승인</button>
+          <button class="btn-reject" data-uid="${h.uid}" style="padding:6px 12px; font-size:12px; background:#fef2f2; color:#dc2626; border:1px solid #fecaca; border-radius:6px; cursor:pointer;">거부</button>
+        </div>
+      </div>
+      <div class="cert-preview hidden" style="margin-top:10px; padding:10px; background:#f8fafc; border-radius:6px;"></div>
+    </div>`).join('');
+
+  container.querySelectorAll('.btn-view').forEach((btn) => {
+    btn.addEventListener('click', () => viewCert((btn as HTMLElement).dataset.uid!));
+  });
+  container.querySelectorAll('.btn-approve').forEach((btn) => {
+    btn.addEventListener('click', () => reviewHospital((btn as HTMLElement).dataset.uid!, 'approve'));
+  });
+  container.querySelectorAll('.btn-reject').forEach((btn) => {
+    btn.addEventListener('click', () => reviewHospital((btn as HTMLElement).dataset.uid!, 'reject'));
+  });
+}
+
+async function viewCert(uid: string) {
+  const row = document.querySelector(`.hospital-row[data-uid="${uid}"]`)!;
+  const preview = row.querySelector('.cert-preview') as HTMLElement;
+
+  if (!preview.classList.contains('hidden') && preview.innerHTML) {
+    preview.classList.add('hidden');
+    return;
+  }
+
+  preview.innerHTML = '<div style="color:var(--text-muted); font-size:12px;">로딩 중...</div>';
+  preview.classList.remove('hidden');
+
+  const res = await fetch(`/api/admin/hospital-cert?uid=${encodeURIComponent(uid)}`, { headers: adminHeaders() });
+  if (!res.ok) { preview.innerHTML = '서류 로드 실패'; return; }
+  const data = await res.json() as { businessCertBase64: string };
+  const src = data.businessCertBase64;
+
+  if (src.startsWith('data:image/')) {
+    preview.innerHTML = `<img src="${src}" style="max-width:100%; max-height:400px; border-radius:4px;" />`;
+  } else if (src.startsWith('data:application/pdf')) {
+    preview.innerHTML = `<iframe src="${src}" style="width:100%; height:500px; border:none;"></iframe>
+      <a href="${src}" download="business-cert.pdf" style="display:block; margin-top:6px; font-size:12px; color:#2563eb;">📥 PDF 다운로드</a>`;
+  } else {
+    preview.innerHTML = `<a href="${src}" download>파일 다운로드</a>`;
+  }
+}
+
+async function reviewHospital(uid: string, action: 'approve' | 'reject') {
+  const label = action === 'approve' ? '승인' : '거부';
+  if (!confirm(`정말 이 병원 계정을 ${label}하시겠습니까?`)) return;
+
+  const res = await fetch('/api/admin/hospitals', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...adminHeaders() },
+    body: JSON.stringify({ uid, action }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    alert(`처리 실패: ${err.error ?? res.statusText}`);
+    return;
+  }
+
+  await loadHospitals();
 }
 
 function showError(e: unknown) {

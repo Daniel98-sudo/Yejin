@@ -68,17 +68,27 @@ async function init() {
       // Custom Claims에서 role 확인
       const tokenResult = await user.getIdTokenResult(true);
       const role = tokenResult.claims['role'];
-      if (role !== 'superadmin' && role !== 'hospital') {
-        showError('관리자 권한이 없는 계정입니다.');
-        loginBtn().disabled = false;
-        loginBtn().textContent = '로그인';
-        return;
-      }
 
       const token = await user.getIdToken();
       sessionStorage.setItem('yejin_admin_token', token);
-      sessionStorage.setItem('yejin_admin_role', String(role));
-      window.location.href = '/admin/dashboard.html';
+      sessionStorage.setItem('yejin_admin_role', String(role ?? ''));
+
+      if (role === 'superadmin') {
+        window.location.href = '/admin/dashboard.html';
+      } else if (role === 'hospital') {
+        window.location.href = '/hospital/dashboard.html';
+      } else {
+        // 권한 없는 계정 — 병원 신청 여부 확인
+        const statusRes = await fetch('/api/hospital/status', { headers: { Authorization: `Bearer ${token}` } });
+        const statusData = await statusRes.json() as { status: string };
+        if (statusData.status === 'pending' || statusData.status === 'rejected') {
+          window.location.href = '/hospital/pending.html';
+        } else {
+          showError('관리자 권한이 없는 계정입니다. 병원 회원가입이 필요하신가요?');
+          loginBtn().disabled = false;
+          loginBtn().textContent = '로그인';
+        }
+      }
 
     } catch (e: unknown) {
       const code = (e as { code?: string }).code ?? '';

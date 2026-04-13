@@ -72,3 +72,62 @@ export async function saveSession(record: SessionRecord): Promise<string> {
   const ref = await db.collection('sessions').add(record);
   return ref.id;
 }
+
+/**
+ * hospitals/{uid}/
+ *   - email: string
+ *   - name: string (병원명)
+ *   - businessCertBase64: string (사업자등록증 원본 파일, data URL)
+ *   - status: 'pending' | 'approved' | 'rejected'
+ *   - createdAt: Timestamp
+ *   - reviewedAt?: Timestamp
+ *   - reviewedBy?: string (superadmin uid)
+ */
+export type HospitalStatus = 'pending' | 'approved' | 'rejected';
+
+export interface HospitalRecord {
+  email: string;
+  name: string;
+  businessCertBase64: string;
+  status: HospitalStatus;
+  createdAt: Timestamp;
+  reviewedAt?: Timestamp;
+  reviewedBy?: string;
+}
+
+export async function createHospitalRecord(
+  uid: string,
+  data: { email: string; name: string; businessCertBase64: string }
+): Promise<void> {
+  const db = getDb();
+  await db.collection('hospitals').doc(uid).set({
+    ...data,
+    status: 'pending',
+    createdAt: Timestamp.now(),
+  } satisfies HospitalRecord);
+}
+
+export async function getHospitalRecord(uid: string): Promise<HospitalRecord | null> {
+  const db = getDb();
+  const doc = await db.collection('hospitals').doc(uid).get();
+  return (doc.exists ? (doc.data() as HospitalRecord) : null);
+}
+
+export async function listPendingHospitals(): Promise<Array<HospitalRecord & { uid: string }>> {
+  const db = getDb();
+  const snap = await db.collection('hospitals').where('status', '==', 'pending').get();
+  return snap.docs.map((d) => ({ uid: d.id, ...(d.data() as HospitalRecord) }));
+}
+
+export async function updateHospitalStatus(
+  uid: string,
+  status: HospitalStatus,
+  reviewedBy: string
+): Promise<void> {
+  const db = getDb();
+  await db.collection('hospitals').doc(uid).update({
+    status,
+    reviewedAt: Timestamp.now(),
+    reviewedBy,
+  });
+}

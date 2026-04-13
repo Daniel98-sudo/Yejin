@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>예진이 — 승인 대기</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <div class="page">
+    <div style="flex:1"></div>
+    <div class="header">
+      <div class="logo">⏳</div>
+      <h1>승인 대기 중</h1>
+      <p id="status-msg">관리자의 승인을 기다리고 있습니다.</p>
+    </div>
+
+    <div id="detail" class="disclaimer" style="background:#eff6ff; border-color:#bfdbfe; color:#1e3a5f; margin-top:24px;">
+      승인이 완료되면 병원 대시보드가 활성화됩니다. 보통 1-2 영업일 이내 처리됩니다.
+    </div>
+
+    <div style="flex:1"></div>
+
+    <div style="padding-bottom: 24px;">
+      <button id="refresh-btn" class="btn btn-primary" style="width:100%;">상태 새로고침</button>
+      <button id="logout-btn" class="btn btn-ghost" style="width:100%; margin-top:10px;">로그아웃</button>
+    </div>
+  </div>
+
+  <script src="/js/hospital/pending.js"></script>
+</body>
+</html>
