@@ -243,5 +243,5 @@ body {
 /* ── Utility ── */
 .mt-auto { margin-top: auto; }
 .mt-16 { margin-top: 16px; }
-.hidden { display: none; }
+.hidden { display: none !important; }
 .loading { text-align: center; color: var(--text-muted); padding: 32px; }
