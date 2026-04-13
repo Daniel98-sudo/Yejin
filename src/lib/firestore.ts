@@ -12,9 +12,20 @@ function initAdmin() {
   });
 }
 
+let dbConfigured = false;
 export function getDb() {
   initAdmin();
-  return getFirestore();
+  const db = getFirestore();
+  if (!dbConfigured) {
+    try {
+      db.settings({ ignoreUndefinedProperties: true });
+      dbConfigured = true;
+    } catch {
+      // settings 가 이미 호출된 경우 무시
+      dbConfigured = true;
+    }
+  }
+  return db;
 }
 
 /**

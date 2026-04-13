@@ -301,6 +301,16 @@ function legacyPrompt(answers: Answer[]): string {
 // ── 메인 ──────────────────────────────────────────────────
 
 export async function POST(req: Request): Promise<Response> {
+  try {
+    return await handle(req);
+  } catch (e) {
+    console.error('[report/generate] uncaught:', e);
+    const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+    return Response.json({ error: `서버 오류: ${msg}` }, { status: 500 });
+  }
+}
+
+async function handle(req: Request): Promise<Response> {
   const uid = await verifyIdToken(req);
   if (!uid) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
