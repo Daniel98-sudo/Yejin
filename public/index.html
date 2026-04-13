@@ -3,80 +3,307 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>예진이 — 병원 가기 전 AI 문진</title>
+  <title>예진이 — 병원 가기 전, AI와 미리 문진하세요</title>
+  <meta name="description" content="예진이는 병원 방문 전 AI와 대화로 증상을 정리해, 의사와의 면담을 준비하는 예진 보고서를 만들어 줍니다." />
   <link rel="stylesheet" href="/css/styles.css" />
-</head>
-<body>
-  <div class="page">
-    <div class="header">
-      <div class="logo">🩺</div>
-      <h1>예진이</h1>
-      <p>병원 가기 전, AI와 미리 문진하세요</p>
-    </div>
+  <style>
+    /* ── Landing scoped styles ── */
+    body.landing { background: #fff; }
+    .landing-wrap { max-width: 100%; margin: 0; padding: 0; display: block; min-height: auto; }
 
-    <div class="disclaimer">
-      <strong>⚠️ 이용 전 꼭 읽어주세요</strong>
-      예진이는 의료기기가 아니며, 의학적 진단을 제공하지 않습니다.
-      본 서비스가 제공하는 정보는 의사와의 면담을 준비하기 위한 참고 자료이며,
-      의사의 진단·처방을 대체하지 않습니다.<br /><br />
-      <strong>응급 상황에서는 즉시 119에 연락하거나 응급실을 방문하세요.</strong>
-    </div>
+    /* Top navigation */
+    .nav {
+      position: sticky; top: 0; z-index: 10;
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: saturate(180%) blur(12px);
+      -webkit-backdrop-filter: saturate(180%) blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      max-width: 1080px; margin: 0 auto;
+      padding: 14px 20px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; color: var(--text); text-decoration: none; }
+    .brand-mark {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      display: grid; place-items: center; color: #fff; font-size: 15px;
+    }
+    .nav-actions { display: flex; align-items: center; gap: 8px; }
+    .nav-link {
+      padding: 8px 14px; border-radius: 8px; font-size: 14px; font-weight: 600;
+      color: var(--text-muted); text-decoration: none; border: 1px solid transparent;
+      transition: color .15s, background .15s, border-color .15s;
+    }
+    .nav-link:hover { color: var(--text); background: #f1f5f9; }
+    .nav-cta {
+      padding: 8px 14px; border-radius: 8px; font-size: 14px; font-weight: 600;
+      background: var(--primary); color: #fff; text-decoration: none;
+      transition: background .15s;
+    }
+    .nav-cta:hover { background: var(--primary-dark); }
 
-    <!-- 과학적 연구 목적 데이터 활용 (개보법 §28조의2) -->
-    <div class="disclaimer" style="background:#eff6ff; border-color:#bfdbfe; color:#1e3a5f;">
-      <strong>📊 과학적 연구 목적 데이터 활용 안내 (필수)</strong>
-      본 서비스 이용 시 발생하는 문진 응답 데이터는 <strong>가명처리</strong> 후
-      「개인정보 보호법」 §28조의2에 따른 <strong>과학적 연구 목적</strong>으로 활용됩니다.
-      실명·연락처·이메일 등 개인 식별정보는 일절 수집·저장되지 않으며,
-      가명처리된 데이터는 타 정보와 결합 금지 및 내부 관리 기록 의무를 준수하여 관리됩니다.
-    </div>
+    /* Section container */
+    .container { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
 
-    <div style="flex:1"></div>
+    /* Hero */
+    .hero { padding: 88px 20px 72px; text-align: center; position: relative; overflow: hidden; }
+    .hero::before {
+      content: ''; position: absolute; inset: 0; z-index: -1;
+      background:
+        radial-gradient(ellipse 70% 50% at 50% 0%, #eff6ff 0%, transparent 60%),
+        radial-gradient(ellipse 40% 30% at 80% 10%, #f0f9ff 0%, transparent 60%);
+    }
+    .hero-badge {
+      display: inline-block; padding: 6px 12px; border-radius: 99px;
+      background: #eff6ff; color: #1d4ed8; font-size: 12px; font-weight: 600;
+      border: 1px solid #dbeafe; margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-size: clamp(32px, 5vw, 52px); line-height: 1.15; font-weight: 800;
+      letter-spacing: -0.02em; color: #0f172a; margin-bottom: 20px;
+    }
+    .hero h1 em {
+      font-style: normal;
+      background: linear-gradient(135deg, #2563eb, #6366f1);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .hero p {
+      font-size: clamp(15px, 2vw, 18px); line-height: 1.6; color: var(--text-muted);
+      max-width: 620px; margin: 0 auto 36px;
+    }
+    .hero-ctas { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .btn-hero {
+      padding: 14px 28px; border-radius: 10px; font-weight: 600; font-size: 16px;
+      text-decoration: none; border: none; cursor: pointer; display: inline-block;
+      transition: transform .1s, background .15s, box-shadow .15s;
+    }
+    .btn-hero-primary {
+      background: var(--primary); color: #fff;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+    }
+    .btn-hero-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
+    .btn-hero-ghost {
+      background: #fff; color: var(--text); border: 1px solid var(--border);
+    }
+    .btn-hero-ghost:hover { background: #f8fafc; }
 
-    <div style="padding-bottom: 16px; display: flex; flex-direction: column; gap: 12px;">
-      <label style="display:flex; align-items:flex-start; gap:10px; font-size:14px; cursor:pointer;">
-        <input type="checkbox" id="agree-check" style="margin-top:2px; accent-color: #2563eb;" />
-        면책 고지 내용을 읽었으며 동의합니다. <span style="color:#dc2626;">(필수)</span>
-      </label>
-      <label style="display:flex; align-items:flex-start; gap:10px; font-size:14px; cursor:pointer;">
-        <input type="checkbox" id="data-check" style="margin-top:2px; accent-color: #2563eb;" />
-        가명처리된 문진 데이터의 과학적 연구 목적 활용에 동의합니다. <span style="color:#dc2626;">(필수)</span>
-      </label>
-      <a id="start-btn" href="/login.html"
-        class="btn btn-primary"
-        style="pointer-events:none; opacity:0.4; margin-top:4px;">
-        예진이 시작하기 →
-      </a>
-    </div>
+    .hero-note { margin-top: 20px; font-size: 12px; color: var(--text-muted); }
 
-    <!-- 관리자 / 병원 로그인 -->
-    <div style="text-align:center; padding-bottom: 24px;">
-      <a href="/admin/login.html" style="font-size:12px; color:var(--text-muted); text-decoration:none; border-bottom: 1px dashed var(--border);">
-        관리자 · 병원 로그인
-      </a>
-    </div>
-  </div>
+    /* Section */
+    section { padding: 64px 0; }
+    .section-header { text-align: center; margin-bottom: 44px; }
+    .section-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--primary); margin-bottom: 8px; }
+    .section-title { font-size: clamp(24px, 3vw, 34px); font-weight: 800; letter-spacing: -0.01em; }
+    .section-subtitle { font-size: 15px; color: var(--text-muted); margin-top: 10px; }
 
-  <script>
-    const agreeCheck = document.getElementById('agree-check');
-    const dataCheck = document.getElementById('data-check');
-    const btn = document.getElementById('start-btn');
+    /* How it works */
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .step {
+      background: #fff; border: 1px solid var(--border); border-radius: 16px;
+      padding: 28px 24px; position: relative;
+    }
+    .step-num {
+      width: 32px; height: 32px; border-radius: 10px;
+      background: #eff6ff; color: var(--primary);
+      display: grid; place-items: center; font-weight: 700; font-size: 14px;
+      margin-bottom: 14px;
+    }
+    .step h3 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+    .step p { font-size: 14px; color: var(--text-muted); line-height: 1.6; }
 
-    agreeCheck.addEventListener('change', updateBtn);
-    dataCheck.addEventListener('change', updateBtn);
+    /* Features */
+    .features { background: #f8fafc; }
+    .feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    .feature {
+      background: #fff; border: 1px solid var(--border); border-radius: 16px;
+      padding: 24px;
+    }
+    .feature-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: #eff6ff; color: var(--primary);
+      display: grid; place-items: center; font-size: 20px; margin-bottom: 14px;
+    }
+    .feature h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+    .feature p { font-size: 14px; color: var(--text-muted); line-height: 1.6; }
 
-    function updateBtn() {
-      const ok = agreeCheck.checked && dataCheck.checked;
-      btn.style.opacity = ok ? '1' : '0.4';
-      btn.style.pointerEvents = ok ? 'auto' : 'none';
+    /* Safety */
+    .safety-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .safety-card {
+      border-radius: 16px; padding: 24px; border: 1px solid;
+    }
+    .safety-card.warn { background: #fefce8; border-color: #fde047; color: #713f12; }
+    .safety-card.info { background: #eff6ff; border-color: #bfdbfe; color: #1e3a5f; }
+    .safety-card strong { display: block; font-size: 14px; margin-bottom: 8px; }
+    .safety-card p { font-size: 13px; line-height: 1.7; }
+
+    /* Final CTA */
+    .cta-band {
+      background: linear-gradient(135deg, #2563eb, #6366f1);
+      color: #fff; text-align: center;
+      padding: 64px 20px; border-radius: 24px; margin: 0 20px 64px;
+      max-width: 1040px; margin-left: auto; margin-right: auto;
+    }
+    .cta-band h2 { font-size: clamp(22px, 3vw, 30px); font-weight: 800; margin-bottom: 10px; letter-spacing: -0.01em; }
+    .cta-band p { font-size: 15px; opacity: 0.9; margin-bottom: 24px; }
+    .cta-band .btn-hero-primary { background: #fff; color: var(--primary); box-shadow: 0 4px 14px rgba(0,0,0,0.15); }
+    .cta-band .btn-hero-primary:hover { background: #f8fafc; }
+
+    /* Admin link */
+    .admin-foot {
+      text-align: center; padding: 24px 20px 48px; border-top: 1px solid var(--border);
+    }
+    .admin-foot a {
+      font-size: 12px; color: var(--text-muted); text-decoration: none;
+      border-bottom: 1px dashed var(--border);
     }
 
-    btn.addEventListener('click', (e) => {
-      if (!agreeCheck.checked || !dataCheck.checked) { e.preventDefault(); return; }
-      // 필수 동의 — 로그인 후 Firestore에 기록
-      sessionStorage.setItem('yejin_data_consent', 'true');
-    });
-  </script>
+    /* Mobile */
+    @media (max-width: 720px) {
+      .steps { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .safety-grid { grid-template-columns: 1fr; }
+      .hero { padding: 56px 20px 48px; }
+      section { padding: 48px 0; }
+      .nav-link[data-hide-mobile] { display: none; }
+    }
+  </style>
+</head>
+<body class="landing">
+  <div class="landing-wrap">
+
+    <!-- Top Nav -->
+    <nav class="nav">
+      <div class="nav-inner">
+        <a href="/" class="brand">
+          <span class="brand-mark">🩺</span>
+          <span>예진이</span>
+        </a>
+        <div class="nav-actions">
+          <a href="/login.html" class="nav-link" data-hide-mobile>로그인</a>
+          <a href="/login.html?mode=signup" class="nav-cta">회원가입</a>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Hero -->
+    <header class="hero">
+      <span class="hero-badge">병원 가기 전 · AI 문진</span>
+      <h1>증상을 말로 풀어보세요.<br/><em>진료실에선 시간이 부족하니까요.</em></h1>
+      <p>
+        예진이는 병원 방문 전 AI와 대화로 증상을 정리해, 의사와의 면담을 준비하는
+        <strong>예진 보고서</strong>를 만들어 줍니다. QR 한 장으로 의료진과 안전하게 공유하세요.
+      </p>
+      <div class="hero-ctas">
+        <a href="/login.html?mode=signup" class="btn-hero btn-hero-primary">무료로 시작하기 →</a>
+        <a href="#how" class="btn-hero btn-hero-ghost">어떻게 작동하나요?</a>
+      </div>
+      <div class="hero-note">이메일 가입 · 이미 가입했다면 <a href="/login.html" style="color:var(--primary);">로그인</a></div>
+    </header>
+
+    <!-- How it works -->
+    <section id="how">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-eyebrow">How it works</div>
+          <div class="section-title">3단계로 진료실을 준비하세요</div>
+          <div class="section-subtitle">평균 5분 이내. 의사가 바로 읽을 수 있는 구조화된 문진지를 받아보세요.</div>
+        </div>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <h3>AI와 대화로 문진</h3>
+            <p>OPQRST 7단계 가이드를 따라 AI가 증상의 부위·시작·양상·강도를 차근차근 물어봅니다.</p>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <h3>예진 보고서 자동 생성</h3>
+            <p>Gemini AI가 답변을 바탕으로 주증상·동반증상·의사에게 꼭 물어볼 질문까지 정리합니다.</p>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <h3>QR로 의료진과 공유</h3>
+            <p>진료실에서 QR을 보여주면 의료진이 72시간 동안 보고서를 열람할 수 있습니다.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="features">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-eyebrow">Why 예진이</div>
+          <div class="section-title">진료 시간을 낭비하지 않도록</div>
+        </div>
+        <div class="feature-grid">
+          <div class="feature">
+            <div class="feature-icon">🧭</div>
+            <h3>OPQRST 기반 체계적 문진</h3>
+            <p>응급의학에서 쓰는 표준 문진 프레임을 따라, 빠뜨리기 쉬운 정보까지 놓치지 않습니다.</p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">🚨</div>
+            <h3>Red Flag 즉시 안내</h3>
+            <p>응급을 의심할 증상이면 즉시 119 안내. 시간을 다투는 상황에서 머뭇거리지 않도록.</p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">🔒</div>
+            <h3>가명처리된 데이터</h3>
+            <p>개인 식별정보는 저장하지 않습니다. 가명처리된 문진 기록만 연구 목적으로 활용됩니다.</p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">⏱️</div>
+            <h3>72시간 제한 공유</h3>
+            <p>QR로 공유된 보고서는 72시간 뒤 자동으로 의료기관 화면에서 사라집니다.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Safety / Legal -->
+    <section>
+      <div class="container">
+        <div class="section-header">
+          <div class="section-eyebrow">Important</div>
+          <div class="section-title">이용 전 꼭 확인해주세요</div>
+        </div>
+        <div class="safety-grid">
+          <div class="safety-card warn">
+            <strong>⚠️ 의료기기 아님 · 응급 시 119</strong>
+            <p>
+              예진이는 의료기기가 아니며 의학적 진단을 제공하지 않습니다. 본 서비스의 정보는
+              의사 면담 준비를 위한 참고 자료이며, 진단·처방을 대체하지 않습니다.
+              <strong>응급 상황에서는 즉시 119에 연락하거나 응급실을 방문하세요.</strong>
+            </p>
+          </div>
+          <div class="safety-card info">
+            <strong>📊 과학적 연구 목적 데이터 활용</strong>
+            <p>
+              문진 응답은 <strong>가명처리</strong> 후 「개인정보 보호법」 §28조의2에 따른
+              과학적 연구 목적으로 활용됩니다. 실명·연락처·이메일 등 개인 식별정보는 수집·저장되지
+              않으며, 가입 시 구체 동의를 받습니다.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Final CTA -->
+    <div class="cta-band">
+      <h2>증상을 말로 정리하는 데 5분이면 충분합니다</h2>
+      <p>병원 대기실에서 머리 속에서만 맴돌던 증상을, 의사에게 건네는 한 장으로.</p>
+      <a href="/login.html?mode=signup" class="btn-hero btn-hero-primary">무료로 시작하기 →</a>
+    </div>
+
+    <!-- Admin link -->
+    <div class="admin-foot">
+      <a href="/admin/login.html">관리자 · 병원 로그인</a>
+    </div>
+
+  </div>
+
   <script src="/js/footer.js"></script>
 </body>
 </html>

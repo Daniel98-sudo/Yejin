@@ -20,6 +20,14 @@
     .msg-err { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
     .msg-ok { background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; }
     .msg-info { background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; }
+    .consent-box {
+      background:#f8fafc; border:1px solid var(--border); border-radius:10px;
+      padding:14px; margin:6px 0 14px; display:flex; flex-direction:column; gap:10px;
+    }
+    .consent-item { display:flex; align-items:flex-start; gap:10px; font-size:13px; line-height:1.5; cursor:pointer; color:var(--text); }
+    .consent-item input { margin-top:3px; accent-color: var(--primary); flex-shrink:0; }
+    .consent-item .req { color:#dc2626; font-weight:600; }
+    .consent-item a { color:var(--primary); text-decoration:underline; }
   </style>
 </head>
 <body>
@@ -49,6 +57,17 @@
       <div class="field hidden" id="password2-field">
         <label for="password2">비밀번호 확인</label>
         <input type="password" id="password2" autocomplete="new-password" placeholder="비밀번호 재입력" />
+      </div>
+
+      <div id="consent-box" class="consent-box hidden">
+        <label class="consent-item">
+          <input type="checkbox" id="consent-disclaimer" />
+          <span>예진이는 의료기기가 아니며 의학적 진단을 제공하지 않는다는 면책 고지를 읽고 동의합니다. <span class="req">(필수)</span></span>
+        </label>
+        <label class="consent-item">
+          <input type="checkbox" id="consent-research" />
+          <span>가명처리된 문진 데이터의 과학적 연구 목적 활용에 동의합니다 (개보법 §28조의2). <a href="/legal.html?doc=privacy" target="_blank">개인정보 처리방침</a> <span class="req">(필수)</span></span>
+        </label>
       </div>
 
       <button id="submit-btn" class="btn btn-primary" style="width:100%; margin-top:4px;">로그인</button>

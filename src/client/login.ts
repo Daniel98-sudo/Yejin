@@ -26,9 +26,20 @@ function setMode(next: Mode) {
   });
   $('password2-field').classList.toggle('hidden', mode !== 'signup');
   $('pw-hint').classList.toggle('hidden', mode !== 'signup');
+  $('consent-box').classList.toggle('hidden', mode !== 'signup');
   $<HTMLButtonElement>('submit-btn').textContent = mode === 'signup' ? '가입하기' : '로그인';
   ($('password') as HTMLInputElement).autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
   clearMsg();
+}
+
+function consentChecked(): boolean {
+  const a = ($('consent-disclaimer') as HTMLInputElement | null)?.checked ?? false;
+  const b = ($('consent-research') as HTMLInputElement | null)?.checked ?? false;
+  return a && b;
+}
+
+function markConsentGiven() {
+  sessionStorage.setItem('yejin_data_consent', 'true');
 }
 
 function showMsg(text: string, kind: 'err' | 'ok' | 'info' = 'err', html = false) {
@@ -110,6 +121,8 @@ async function handleEmailSubmit() {
       showMsg('비밀번호는 영문자와 숫자를 모두 포함해야 합니다.'); return;
     }
     if (password !== password2) { showMsg('비밀번호가 일치하지 않습니다.'); return; }
+    if (!consentChecked()) { showMsg('가입을 위해 필수 동의 항목 2가지를 모두 체크해주세요.'); return; }
+    markConsentGiven();
   }
 
   submitBtn.disabled = true;
@@ -161,6 +174,10 @@ async function handleEmailSubmit() {
 }
 
 async function handleGoogleLogin() {
+  if (mode === 'signup') {
+    if (!consentChecked()) { showMsg('가입을 위해 필수 동의 항목 2가지를 모두 체크해주세요.'); return; }
+    markConsentGiven();
+  }
   const btn = $<HTMLButtonElement>('google-login');
   btn.disabled = true;
   const original = btn.innerHTML;
@@ -218,6 +235,9 @@ async function init() {
   document.querySelectorAll('.auth-tab').forEach((el) => {
     el.addEventListener('click', () => setMode((el as HTMLElement).dataset.mode as Mode));
   });
+
+  const urlMode = new URLSearchParams(window.location.search).get('mode');
+  if (urlMode === 'signup') setMode('signup');
 
   $('submit-btn').addEventListener('click', handleEmailSubmit);
   $('google-login').addEventListener('click', handleGoogleLogin);
