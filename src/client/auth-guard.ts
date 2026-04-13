@@ -1,9 +1,10 @@
-import { initFirebase, onAuthChanged, getIdToken } from '../lib/firebase-client';
+import { initFirebase, onAuthChanged, getIdToken, getFirebaseAuth } from '../lib/firebase-client';
 
 /**
- * 모든 보호된 페이지 상단에서 호출.
- * 로그인 안 된 경우 /login.html로 리디렉션하고 null 반환.
- * 로그인된 경우 최신 ID 토큰을 반환.
+ * 보호된 페이지 상단에서 호출.
+ * - 미로그인 → /login.html 리디렉션
+ * - 이메일 미인증 → /login.html 리디렉션 (재인증 유도)
+ * - 정상 → 최신 ID 토큰 반환
  */
 export async function requireAuth(): Promise<string> {
   await initFirebase();
@@ -15,7 +16,16 @@ export async function requireAuth(): Promise<string> {
         window.location.href = '/login.html';
         return;
       }
-      // 토큰 갱신 (만료 대비)
+
+      // 이메일/비밀번호 가입자는 인증 필수. Google 등은 자동 인증됨.
+      await user.reload();
+      const fresh = getFirebaseAuth().currentUser;
+      if (!fresh || !fresh.emailVerified) {
+        await getFirebaseAuth().signOut();
+        window.location.href = '/login.html?unverified=1';
+        return;
+      }
+
       const token = await getIdToken();
       if (!token) {
         window.location.href = '/login.html';

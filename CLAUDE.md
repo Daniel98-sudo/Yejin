@@ -35,21 +35,10 @@
 
 ## 3. 팀워크 시스템 — Scout/Gemini 파이프라인
 
-### 역할 분담
-- **Claude**: 맥락 이해 + 설계 + 지시서 작성 + 최종 판단
-- **Scout (Llama 4)**: 코드 초안 작성
-- **Gemini (2.5 Flash)**: 검증 + 보완
-
-### 호출 규칙
-- 단일 구현 요청 → Claude가 관련 파일 Read → 지시서 작성 → `call-pipeline.sh` 호출
-- `scout` 키워드 → `call-scout.sh` 직접
-- `gemini` 키워드 → `call-gemini.sh` 직접
-
-### 파이프라인 호출 예시
-```bash
-echo '{"task":"...", "context":"...", "instructions":"...", "mode":"implement"}' \
-  | bash .claude/scripts/call-pipeline.sh
-```
+전역 규칙 (`~/.claude/CLAUDE.md`) 참조. 요약:
+- **Scout (Llama 4)** 가 초안 → **Gemini Flash (latest)** 가 검증/개선 → Claude가 파일 반영
+- 독립 함수·보일러플레이트·단일 파일 리팩터링은 파이프라인으로 위임
+- 호출: `echo '{"task":"...","context":"...","instructions":"..."}' | bash ~/.claude/scripts/call-pipeline.sh`
 
 ---
 

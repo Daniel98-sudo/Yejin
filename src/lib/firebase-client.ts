@@ -3,8 +3,13 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+  sendPasswordResetEmail,
   signOut,
   onAuthStateChanged,
+  fetchSignInMethodsForEmail,
   type Auth,
   type User,
 } from 'firebase/auth';
@@ -39,6 +44,35 @@ export async function signInWithGoogle(): Promise<User> {
   return result.user;
 }
 
+export async function signUpWithEmail(email: string, password: string): Promise<User> {
+  const cred = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
+  await sendEmailVerification(cred.user, {
+    url: `${window.location.origin}/login.html?verified=1`,
+  });
+  return cred.user;
+}
+
+export async function signInWithEmail(email: string, password: string): Promise<User> {
+  const cred = await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
+  return cred.user;
+}
+
+export async function resendVerification(user: User): Promise<void> {
+  await sendEmailVerification(user, {
+    url: `${window.location.origin}/login.html?verified=1`,
+  });
+}
+
+export async function resetPassword(email: string): Promise<void> {
+  await sendPasswordResetEmail(getFirebaseAuth(), email, {
+    url: `${window.location.origin}/login.html`,
+  });
+}
+
+export async function checkEmailProviders(email: string): Promise<string[]> {
+  return fetchSignInMethodsForEmail(getFirebaseAuth(), email);
+}
+
 export async function logout(): Promise<void> {
   await signOut(getFirebaseAuth());
   sessionStorage.clear();
@@ -53,4 +87,23 @@ export async function getIdToken(): Promise<string | null> {
   const user = getFirebaseAuth().currentUser;
   if (!user) return null;
   return user.getIdToken();
+}
+
+/**
+ * 로그인 직후 sessionStorage의 데이터 수집 동의를 Firestore에 기록.
+ * 환자 로그인 플로우에서 매 로그인마다 호출.
+ */
+export async function syncDataConsent(token: string): Promise<void> {
+  const raw = sessionStorage.getItem('yejin_data_consent');
+  if (raw === null) return;
+  try {
+    await fetch('/api/consent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ consent: raw === 'true' }),
+    });
+    sessionStorage.removeItem('yejin_data_consent');
+  } catch {
+    // 동의 저장 실패는 치명적이지 않음 — 다음 세션에 재시도
+  }
 }

@@ -1,27 +1,189 @@
-import { initFirebase, signInWithGoogle } from '../lib/firebase-client';
+import {
+  initFirebase,
+  signInWithGoogle,
+  signUpWithEmail,
+  signInWithEmail,
+  resendVerification,
+  resetPassword,
+  syncDataConsent,
+} from '../lib/firebase-client';
+import type { User } from 'firebase/auth';
+
+type Mode = 'signin' | 'signup';
+let mode: Mode = 'signin';
+let pendingUser: User | null = null;
+
+const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+
+function setMode(next: Mode) {
+  mode = next;
+  document.querySelectorAll('.auth-tab').forEach((el) => {
+    el.classList.toggle('active', (el as HTMLElement).dataset.mode === mode);
+  });
+  $('password2-field').classList.toggle('hidden', mode !== 'signup');
+  $('pw-hint').classList.toggle('hidden', mode !== 'signup');
+  $<HTMLButtonElement>('submit-btn').textContent = mode === 'signup' ? '가입하기' : '로그인';
+  ($('password') as HTMLInputElement).autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
+  clearMsg();
+}
+
+function showMsg(text: string, kind: 'err' | 'ok' | 'info' = 'err', html = false) {
+  const box = $('msg-box');
+  box.innerHTML = `<div class="msg msg-${kind}"></div>`;
+  const inner = box.firstElementChild as HTMLElement;
+  if (html) inner.innerHTML = text; else inner.textContent = text;
+}
+
+function clearMsg() { $('msg-box').innerHTML = ''; }
+
+const FIREBASE_ERRORS: Record<string, string> = {
+  'auth/invalid-email': '이메일 형식이 올바르지 않습니다.',
+  'auth/user-not-found': '존재하지 않는 계정입니다.',
+  'auth/wrong-password': '비밀번호가 올바르지 않습니다.',
+  'auth/invalid-credential': '이메일 또는 비밀번호가 올바르지 않습니다.',
+  'auth/email-already-in-use': '이미 가입된 이메일입니다. 로그인 탭에서 시도해주세요.',
+  'auth/weak-password': '비밀번호는 6자 이상이어야 합니다.',
+  'auth/too-many-requests': '시도가 너무 많습니다. 잠시 후 다시 시도해주세요.',
+  'auth/account-exists-with-different-credential':
+    '이미 이메일 또는 다른 방법으로 가입된 계정입니다. 원래 방법으로 로그인해주세요.',
+  'auth/popup-closed-by-user': '로그인 창이 닫혔습니다.',
+  'auth/popup-blocked': '팝업이 차단되었습니다. 브라우저 설정을 확인해주세요.',
+};
+
+function errMessage(e: unknown): string {
+  const code = (e as { code?: string })?.code ?? '';
+  return FIREBASE_ERRORS[code] ?? '요청 처리에 실패했습니다. 다시 시도해주세요.';
+}
+
+async function proceedAfterLogin(user: User) {
+  const token = await user.getIdToken();
+  sessionStorage.setItem('yejin_token', token);
+  await syncDataConsent(token);
+  window.location.href = '/chat.html';
+}
+
+function showVerifyPrompt(user: User) {
+  pendingUser = user;
+  showMsg(
+    `<strong>이메일 인증이 필요합니다.</strong><br/>
+     <code>${user.email}</code> 로 인증 메일을 보냈습니다. 메일의 링크를 클릭한 뒤
+     <button class="link-btn" id="reload-verify">여기를 눌러 다시 확인</button>해주세요.
+     <br/><button class="link-btn" id="resend-btn">인증 메일 재전송</button>`,
+    'info', true,
+  );
+  $('reload-verify').addEventListener('click', async () => {
+    if (!pendingUser) return;
+    await pendingUser.reload();
+    if (pendingUser.emailVerified) {
+      await proceedAfterLogin(pendingUser);
+    } else {
+      showMsg('아직 인증이 완료되지 않았습니다. 메일의 링크를 클릭해주세요.', 'info');
+    }
+  });
+  $('resend-btn').addEventListener('click', async () => {
+    if (!pendingUser) return;
+    try {
+      await resendVerification(pendingUser);
+      showMsg('인증 메일을 재전송했습니다. 받은 편지함을 확인해주세요.', 'ok');
+    } catch (e) {
+      showMsg(errMessage(e), 'err');
+    }
+  });
+}
+
+async function handleEmailSubmit() {
+  const email = ($('email') as HTMLInputElement).value.trim();
+  const password = ($('password') as HTMLInputElement).value;
+  const submitBtn = $<HTMLButtonElement>('submit-btn');
+
+  if (!email || !password) { showMsg('이메일과 비밀번호를 입력해주세요.'); return; }
+
+  if (mode === 'signup') {
+    const password2 = ($('password2') as HTMLInputElement).value;
+    if (password.length < 8) { showMsg('비밀번호는 8자 이상으로 설정해주세요.'); return; }
+    if (password !== password2) { showMsg('비밀번호가 일치하지 않습니다.'); return; }
+  }
+
+  submitBtn.disabled = true;
+  const originalText = submitBtn.textContent;
+  submitBtn.textContent = '처리 중...';
+
+  try {
+    const user = mode === 'signup'
+      ? await signUpWithEmail(email, password)
+      : await signInWithEmail(email, password);
+
+    if (!user.emailVerified) {
+      showVerifyPrompt(user);
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalText;
+      return;
+    }
+    await proceedAfterLogin(user);
+  } catch (e) {
+    showMsg(errMessage(e));
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalText;
+  }
+}
+
+async function handleGoogleLogin() {
+  const btn = $<HTMLButtonElement>('google-login');
+  btn.disabled = true;
+  const original = btn.innerHTML;
+  btn.textContent = '로그인 중...';
+  clearMsg();
+
+  try {
+    const user = await signInWithGoogle();
+    // Google은 이미 이메일 인증된 계정만 제공
+    await proceedAfterLogin(user);
+  } catch (e) {
+    showMsg(errMessage(e));
+    btn.disabled = false;
+    btn.innerHTML = original;
+  }
+}
+
+async function handleForgotPassword() {
+  const email = ($('email') as HTMLInputElement).value.trim();
+  if (!email) { showMsg('비밀번호를 재설정할 이메일을 입력 칸에 먼저 적어주세요.'); return; }
+  try {
+    await resetPassword(email);
+    showMsg(`비밀번호 재설정 메일을 ${email} 로 보냈습니다.`, 'ok');
+  } catch (e) {
+    showMsg(errMessage(e));
+  }
+}
+
+function handlePendingBanner() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('verified') === '1') {
+    showMsg('이메일 인증이 완료되었습니다. 로그인해주세요.', 'ok');
+  }
+  if (params.get('unverified') === '1') {
+    showMsg('이메일 인증이 필요합니다. 로그인 후 인증 메일을 확인해주세요.', 'info');
+  }
+}
 
 async function init() {
   await initFirebase();
 
-  document.getElementById('google-login')!.addEventListener('click', async () => {
-    const btn = document.getElementById('google-login') as HTMLButtonElement;
-    const errEl = document.getElementById('error-msg')!;
-    btn.disabled = true;
-    btn.textContent = '로그인 중...';
-    errEl.classList.add('hidden');
-
-    try {
-      const user = await signInWithGoogle();
-      const token = await user.getIdToken();
-      sessionStorage.setItem('yejin_token', token);
-      window.location.href = '/';
-    } catch (e) {
-      errEl.textContent = '로그인에 실패했습니다. 다시 시도해주세요.';
-      errEl.classList.remove('hidden');
-      btn.disabled = false;
-      btn.textContent = 'Google로 계속하기';
-    }
+  document.querySelectorAll('.auth-tab').forEach((el) => {
+    el.addEventListener('click', () => setMode((el as HTMLElement).dataset.mode as Mode));
   });
+
+  $('submit-btn').addEventListener('click', handleEmailSubmit);
+  $('google-login').addEventListener('click', handleGoogleLogin);
+  $('forgot-btn').addEventListener('click', handleForgotPassword);
+
+  [$('email'), $('password'), $('password2')].forEach((el) => {
+    el.addEventListener('keydown', (e) => {
+      if ((e as KeyboardEvent).key === 'Enter') handleEmailSubmit();
+    });
+  });
+
+  handlePendingBanner();
 }
 
 init();
